@@ -1310,3 +1310,66 @@ with _link_col:
         "https://creator.line.me/zh-hant/",
         use_container_width=True,
     )
+
+
+# ============================================================
+# PUBLIC STEP 02A｜個人設定匯出／匯入
+# ============================================================
+def _public02a_settings_panel():
+    st.markdown(
+        """
+        <div style="
+            max-width:760px;
+            margin:28px auto 12px;
+            padding:16px 20px;
+            border-radius:14px;
+            border:2px solid #4b5563;
+            background:#151b26;
+            text-align:center;
+        ">
+            <div style="font-size:24px;font-weight:800;color:#ffffff;">
+                🔐 我的個人設定
+            </div>
+            <div style="font-size:15px;color:#cbd5e1;margin-top:6px;">
+                自定義風格、詞語與人物／場景需求只屬於目前使用者。
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    export_data = json.dumps(
+        _public02a_get_settings(),
+        ensure_ascii=False,
+        indent=2,
+    ).encode("utf-8")
+
+    c1, c2 = st.columns(2)
+    with c1:
+        st.download_button(
+            "📤 匯出我的設定",
+            data=export_data,
+            file_name="LINE貼圖工具_我的設定.json",
+            mime="application/json",
+            use_container_width=True,
+            key="public02a_export_settings",
+        )
+
+    with c2:
+        imported = st.file_uploader(
+            "📥 匯入我的設定",
+            type=["json"],
+            key="public02a_import_settings",
+            help="選擇之前匯出的 LINE貼圖工具_我的設定.json",
+        )
+        if imported is not None:
+            try:
+                data = json.loads(imported.getvalue().decode("utf-8"))
+                _public02a_apply_settings(data)
+                st.success("✅ 我的設定已匯入")
+                st.info("請重新整理頁面，讓所有欄位同步顯示。")
+            except Exception as exc:
+                st.error(f"❌ 匯入失敗：{exc}")
+
+# PUBLIC STEP 02A｜顯示個人設定匯出／匯入
+_public02a_settings_panel()
