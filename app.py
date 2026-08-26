@@ -23,87 +23,175 @@ V10_CUSTOM_PHRASE_POOL_FILE = V10_DATA_DIR / "V10_custom_phrase_pool.json"
 V10_LEGACY_PRESET_FILE = Path(__file__).with_name("V10_user_presets.json")
 V10_LEGACY_PHRASE_POOL_FILE = Path(__file__).with_name("V10_custom_phrase_pool.json")
 
+def _public02a_default_settings():
+    return {
+        "style_custom": [""] * 10,
+        "style_custom_names": [f"使用者自定{i}" for i in range(1, 11)],
+        "character_custom": ["", "", ""],
+        "character_enabled": [False, False, False],
+        "custom_phrases": [],
+    }
+
+
+def _public02a_normalize_settings(data):
+    base = _public02a_default_settings()
+    if not isinstance(data, dict):
+        return base
+
+    for key in ("style_custom", "style_custom_names"):
+        value = data.get(key)
+        if isinstance(value, list):
+            value = [str(x) if x is not None else "" for x in value[:10]]
+            value += [""] * (10 - len(value))
+            base[key] = value
+
+    value = data.get("character_custom")
+    if isinstance(value, list):
+        value = [str(x) if x is not None else "" for x in value[:3]]
+        value += [""] * (3 - len(value))
+        base["character_custom"] = value
+
+    value = data.get("character_enabled")
+    if isinstance(value, list):
+        value = [bool(x) for x in value[:3]]
+        value += [False] * (3 - len(value))
+        base["character_enabled"] = value
+
+    value = data.get("custom_phrases")
+    if isinstance(value, list):
+        base["custom_phrases"] = list(dict.fromkeys(
+            str(x).strip() for x in value if str(x).strip()
+        ))
+
+    return base
+
+
+def _public02a_get_settings():
+    return {
+        "style_custom": [
+            st.session_state.get(f"v10_style_custom_{i}", "")
+            for i in range(1, 11)
+        ],
+        "style_custom_names": [
+            st.session_state.get(f"v10_style_name_{i}", f"使用者自定{i}")
+            for i in range(1, 11)
+        ],
+        "character_custom": [
+            st.session_state.get(f"v10_character_custom_{i}", "")
+            for i in range(1, 4)
+        ],
+        "character_enabled": [
+            bool(st.session_state.get(f"v10_character_enabled_{i}", False))
+            for i in range(1, 4)
+        ],
+        "custom_phrases": list(st.session_state.get("public02a_custom_phrases", [])),
+    }
+
+
+def _public02a_apply_settings(data):
+    data = _public02a_normalize_settings(data)
+
+    for i in range(1, 11):
+        st.session_state[f"v10_style_custom_{i}"] = data["style_custom"][i - 1]
+        st.session_state[f"v10_style_name_{i}"] = data["style_custom_names"][i - 1]
+
+    for i in range(1, 4):
+        st.session_state[f"v10_character_custom_{i}"] = data["character_custom"][i - 1]
+        st.session_state[f"v10_character_enabled_{i}"] = data["character_enabled"][i - 1]
+
+    st.session_state["public02a_custom_phrases"] = list(data["custom_phrases"])
+
+
+def _public02a_init():
+    defaults = _public02a_default_settings()
+
+    if not st.session_state.get("public02a_initialized", False):
+        for i in range(1, 11):
+            st.session_state.setdefault(
+                f"v10_style_custom_{i}", defaults["style_custom"][i - 1]
+            )
+            st.session_state.setdefault(
+                f"v10_style_name_{i}", defaults["style_custom_names"][i - 1]
+            )
+
+        for i in range(1, 4):
+            st.session_state.setdefault(
+                f"v10_character_custom_{i}", defaults["character_custom"][i - 1]
+            )
+            st.session_state.setdefault(
+                f"v10_character_enabled_{i}", defaults["character_enabled"][i - 1]
+            )
+
+        st.session_state.setdefault("public02a_custom_phrases", [])
+        st.session_state["public02a_initialized"] = True
+
+
+_public02a_init()
+
+# 每個 Streamlit Session 都有自己的語詞池。
+# 不再讀寫共用的 v10_data/V10_custom_phrase_pool.json。
+V10_CUSTOM_PHRASE_POOL = st.session_state["public02a_custom_phrases"]
+
+
 def _load_v10_phrase_pool():
-    try:
-        source = V10_CUSTOM_PHRASE_POOL_FILE
-        if not source.exists() and V10_LEGACY_PHRASE_POOL_FILE.exists():
-            source = V10_LEGACY_PHRASE_POOL_FILE
-        if source.exists():
-            d=json.loads(source.read_text(encoding="utf-8"))
-            if isinstance(d, list):
-                values=[str(x).strip() for x in d if str(x).strip()]
-                # 首次升級時搬到獨立資料夾。
-                if source != V10_CUSTOM_PHRASE_POOL_FILE:
-                    try:
-                        V10_CUSTOM_PHRASE_POOL_FILE.write_text(
-                            json.dumps(values,ensure_ascii=False,indent=2),encoding="utf-8"
-                        )
-                    except Exception:
-                        pass
-                return values
-    except Exception:
-        pass
-    return []
+    # 公開版：只從目前使用者 Session 取得。
+    return list(st.session_state.get("public02a_custom_phrases", []))
+
 
 def _save_v10_phrase_pool(values):
-    values=list(dict.fromkeys([str(x).strip() for x in values if str(x).strip()]))
-    try:
-        tmp=V10_CUSTOM_PHRASE_POOL_FILE.with_suffix(".json.tmp")
-        tmp.write_text(json.dumps(values,ensure_ascii=False,indent=2),encoding="utf-8")
-        tmp.replace(V10_CUSTOM_PHRASE_POOL_FILE)
-        return True
-    except Exception:
-        return False
-
-V10_CUSTOM_PHRASE_POOL = _load_v10_phrase_pool()
+    # 公開版：只更新目前使用者 Session，不寫入共用檔案。
+    values = list(dict.fromkeys(
+        str(x).strip() for x in values if str(x).strip()
+    ))
+    st.session_state["public02a_custom_phrases"] = values
+    return True
 
 
 def _load_v10_presets():
-    d={"style_custom":[""]*10,
-       "style_custom_names":[f"使用者自定{i}" for i in range(1,11)],
-       "character_custom":["","",""],
-       "character_enabled":[False,False,False]}
-    try:
-        source = V10_PRESET_FILE
-        if not source.exists() and V10_LEGACY_PRESET_FILE.exists():
-            source = V10_LEGACY_PRESET_FILE
-        if source.exists():
-            x=json.loads(source.read_text(encoding="utf-8"))
-            d.update(x)
-            # 首次升級時搬到獨立資料夾。
-            if source != V10_PRESET_FILE:
-                try:
-                    V10_PRESET_FILE.write_text(
-                        json.dumps(d,ensure_ascii=False,indent=2),encoding="utf-8"
-                    )
-                except Exception:
-                    pass
-    except Exception:
-        pass
-    return d
+    # 公開版：不讀取共用 v10_data，避免不同使用者互相看到資料。
+    return {
+        "style_custom": [
+            st.session_state.get(f"v10_style_custom_{i}", "")
+            for i in range(1, 11)
+        ],
+        "style_custom_names": [
+            st.session_state.get(f"v10_style_name_{i}", f"使用者自定{i}")
+            for i in range(1, 11)
+        ],
+        "character_custom": [
+            st.session_state.get(f"v10_character_custom_{i}", "")
+            for i in range(1, 4)
+        ],
+        "character_enabled": [
+            bool(st.session_state.get(f"v10_character_enabled_{i}", False))
+            for i in range(1, 4)
+        ],
+    }
+
 
 def _save_v10_presets():
-    d={
-        "style_custom":[st.session_state.get(f"v10_style_custom_{i}","") for i in range(1,11)],
-        "style_custom_names":[st.session_state.get(f"v10_style_name_{i}",f"使用者自定{i}") for i in range(1,11)],
-        "character_custom":[st.session_state.get(f"v10_character_custom_{i}","") for i in range(1,4)],
-        "character_enabled":[bool(st.session_state.get(f"v10_character_enabled_{i}",False)) for i in range(1,4)],
-    }
-    try:
-        tmp=V10_PRESET_FILE.with_suffix(".json.tmp")
-        tmp.write_text(json.dumps(d,ensure_ascii=False,indent=2),encoding="utf-8")
-        tmp.replace(V10_PRESET_FILE)
-        return True
-    except Exception:
-        return False
+    # 公開版：只更新目前使用者 Session，不寫入共用檔案。
+    for i in range(1, 11):
+        st.session_state[f"v10_style_custom_{i}"] = st.session_state.get(
+            f"v10_style_custom_{i}", ""
+        )
+        st.session_state[f"v10_style_name_{i}"] = st.session_state.get(
+            f"v10_style_name_{i}", f"使用者自定{i}"
+        )
 
-_pd=_load_v10_presets()
-for _i in range(1,11):
-    st.session_state.setdefault(f"v10_style_custom_{_i}", (_pd.get("style_custom") or [""]*10)[_i-1])
-    st.session_state.setdefault(f"v10_style_name_{_i}", (_pd.get("style_custom_names") or [f"使用者自定{i}" for i in range(1,11)])[_i-1])
-for _i in range(1,4):
-    st.session_state.setdefault(f"v10_character_custom_{_i}", (_pd.get("character_custom") or ["","",""])[_i-1])
-    st.session_state.setdefault(f"v10_character_enabled_{_i}", (_pd.get("character_enabled") or [False,False,False])[_i-1])
+    for i in range(1, 4):
+        st.session_state[f"v10_character_custom_{i}"] = st.session_state.get(
+            f"v10_character_custom_{i}", ""
+        )
+        st.session_state[f"v10_character_enabled_{i}"] = bool(
+            st.session_state.get(f"v10_character_enabled_{i}", False)
+        )
+
+    return True
+
+
+# 舊版 v10_data/ 仍保留在專案中，作為備份資料，不由公開版讀寫。
+
 import streamlit.components.v1 as components
 
 # ============================================================
