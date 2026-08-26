@@ -484,7 +484,10 @@ for _i in range(1,4):
 _custom_character_values=[st.session_state.get(f"v10_character_custom_{_i}","").strip() for _i in range(1,4) if st.session_state.get(f"v10_character_enabled_{_i}",False)]
 custom_character="\n".join(_custom_character_values)
 if st.button("💾 儲存人物／場景設定",key="v10_save_character",use_container_width=True):
-    st.success("✅ 3 組人物／場景設定已儲存") if _save_v10_presets() else st.error("❌ 儲存失敗")
+    if _save_v10_presets():
+        st.success("✅ 3 組人物／場景設定已儲存")
+    else:
+        st.error("❌ 儲存失敗")
 
 v10_section("💬 ④ 01～08 貼圖文字", "#3498db")
 st.caption("🎲 內建語詞池＋你的專屬隨機語詞池。可新增、儲存，也可從池子隨機抽取。")
