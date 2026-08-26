@@ -8,6 +8,7 @@ from PIL import Image
 import random
 from pathlib import Path
 import json
+import hashlib
 
 # ------------------------------------------------------------
 # V10 使用者資料本／獨立儲存區
@@ -1369,10 +1370,21 @@ def _public02a_settings_panel():
         )
         if imported is not None:
             try:
-                data = json.loads(imported.getvalue().decode("utf-8"))
-                _public02a_apply_settings(data)
-                st.success("✅ 我的設定已匯入")
-                st.rerun()
+                raw = imported.getvalue()
+                import_hash = hashlib.sha256(raw).hexdigest()
+                last_hash = st.session_state.get("public02a_last_import_hash")
+
+                # Streamlit keeps the uploader value across reruns.  Only process
+                # a newly selected file; otherwise the same file would call
+                # st.rerun() forever.
+                if import_hash != last_hash:
+                    data = json.loads(raw.decode("utf-8"))
+                    _public02a_apply_settings(data)
+                    st.session_state["public02a_last_import_hash"] = import_hash
+                    st.session_state["public02a_import_success"] = True
+                    st.rerun()
+                elif st.session_state.get("public02a_import_success"):
+                    st.success("✅ 我的設定已匯入")
             except Exception as exc:
                 st.error(f"❌ 匯入失敗：{exc}")
 
