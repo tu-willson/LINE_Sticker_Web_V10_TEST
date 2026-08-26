@@ -399,41 +399,39 @@ client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 #
 # service_role 只存在伺服器端 st.secrets，不會顯示給訪客。
 # ============================================================
+def _supabase_rpc(function_name):
+    """伺服器端呼叫 Supabase RPC。只使用 Streamlit Secrets。"""
+    supabase_url = str(st.secrets["SUPABASE_URL"]).rstrip("/")
+    service_role_key = str(st.secrets["SUPABASE_SERVICE_ROLE_KEY"])
+    endpoint = f"{supabase_url}/rest/v1/rpc/{function_name}"
+    req = urllib.request.Request(
+        endpoint,
+        data=b"{}",
+        method="POST",
+        headers={
+            "apikey": service_role_key,
+            "Authorization": f"Bearer {service_role_key}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        },
+    )
+    with urllib.request.urlopen(req, timeout=10) as response:
+        payload = json.loads(response.read().decode("utf-8"))
+    if isinstance(payload, list):
+        return payload[0] if payload else {}
+    if isinstance(payload, dict):
+        return payload
+    return {}
+
+
 def _get_daily_ai_quota():
     """從 Supabase RPC 讀取全站今日額度。失敗時回傳 None。"""
     try:
-        supabase_url = str(st.secrets["SUPABASE_URL"]).rstrip("/")
-        service_role_key = str(st.secrets["SUPABASE_SERVICE_ROLE_KEY"])
-
-        endpoint = f"{supabase_url}/rest/v1/rpc/get_daily_ai_quota"
-        req = urllib.request.Request(
-            endpoint,
-            data=b"{}",
-            method="POST",
-            headers={
-                "apikey": service_role_key,
-                "Authorization": f"Bearer {service_role_key}",
-                "Content-Type": "application/json",
-                "Accept": "application/json",
-            },
-        )
-
-        with urllib.request.urlopen(req, timeout=10) as response:
-            payload = json.loads(response.read().decode("utf-8"))
-
-        # PostgreSQL returns a JSON array for RETURNS TABLE.
-        if isinstance(payload, list):
-            row = payload[0] if payload else {}
-        elif isinstance(payload, dict):
-            row = payload
-        else:
-            return None
-
+        row = _supabase_rpc("get_daily_ai_quota")
         used = int(row.get("used_count", 0))
         remaining = int(row.get("remaining", 10))
         limit = int(row.get("quota_limit", 10))
 
-        # 防止資料庫異常值造成 UI 顯示錯誤。
         limit = max(1, limit)
         used = max(0, min(used, limit))
         remaining = max(0, min(remaining, limit))
@@ -446,6 +444,56 @@ def _get_daily_ai_quota():
 
     except Exception as exc:
         # 公開版不要把 Supabase endpoint、secret 或完整錯誤內容顯示給訪客。
+        st.session_state["public_quota_error"] = type(exc).__name__
+        return None
+
+
+def _consume_daily_ai_quota():
+    """
+    真正取得 1 次全站 AI 額度。
+    成功回傳 quota dict；沒有額度或 RPC 失敗則回傳 None。
+    """
+    try:
+        row = _supabase_rpc("consume_daily_ai_quota")
+        used = int(row.get("used_count", 0))
+        remaining = int(row.get("remaining", 0))
+        limit = int(row.get("quota_limit", 10))
+
+        limit = max(1, limit)
+        used = max(0, min(used, limit))
+        remaining = max(0, min(remaining, limit))
+
+        # consume function 若沒有取得額度，通常會回傳 remaining=0。
+        # 這裡不自行修改資料庫，避免前端繞過 RPC 規則。
+        return {
+            "used_count": used,
+            "remaining": remaining,
+            "quota_limit": limit,
+        }
+
+    except Exception as exc:
+        st.session_state["public_quota_error"] = type(exc).__name__
+        return None
+
+
+def _refund_daily_ai_quota():
+    """OpenAI 生成失敗時，退回本次已取得的 1 次額度。"""
+    try:
+        row = _supabase_rpc("refund_daily_ai_quota")
+        used = int(row.get("used_count", 0))
+        remaining = int(row.get("remaining", 0))
+        limit = int(row.get("quota_limit", 10))
+
+        limit = max(1, limit)
+        used = max(0, min(used, limit))
+        remaining = max(0, min(remaining, limit))
+
+        return {
+            "used_count": used,
+            "remaining": remaining,
+            "quota_limit": limit,
+        }
+    except Exception as exc:
         st.session_state["public_quota_error"] = type(exc).__name__
         return None
 
@@ -501,7 +549,6 @@ def _show_daily_ai_quota():
         st.error("🔴 全站今日 AI 額度已用完，請明天再試。")
 
     return quota
-
 
 
 COMMON_PHRASES = [
@@ -1136,6 +1183,58 @@ if st.button("✨ 生成 4×2 八格總圖", type="primary", use_container_width
     if not filled:
         st.warning("請至少輸入一格貼圖文字。")
         st.stop()
+
+    # ========================================================
+    # PUBLIC STEP 02B-2E
+    # 真正扣除「全站每日 10 次」額度。
+    #
+    # 原則：
+    # 1. 額度檢查/扣除在 OpenAI 呼叫之前。
+    # 2. 沒有額度：直接停止，絕不呼叫 OpenAI。
+    # 3. OpenAI 成功：保留本次額度。
+    # 4. OpenAI 失敗：退回本次額度。
+    # ========================================================
+    with st.spinner("正在確認全站 AI 額度……"):
+        _quota_claim = _consume_daily_ai_quota()
+
+    if _quota_claim is None:
+        st.error(
+            "❌ 目前無法確認全站 AI 額度，因此為了保護系統與 API 費用，"
+            "本次不會執行 AI 生成。請稍後再試。"
+        )
+        st.stop()
+
+    _remaining_after_claim = int(_quota_claim.get("remaining", 0))
+    _limit_after_claim = int(_quota_claim.get("quota_limit", 10))
+
+    # 這裡的 consume RPC 是唯一的扣額來源。
+    # 若 RPC 明確回傳 0 次剩餘，代表本次沒有取得額度。
+    if _remaining_after_claim < 0 or _remaining_after_claim > _limit_after_claim:
+        st.error("❌ AI 額度資料異常，本次不執行生成。")
+        st.stop()
+
+    # 若資料庫 function 在「無額度」時回傳 remaining=0，
+    # 仍需要區分「剛好使用完最後 1 次」與「原本就已經 0 次」。
+    # 因此重新讀取一次，確認 consume 後 used_count 是否真的增加。
+    _quota_after_claim = _get_daily_ai_quota()
+    if _quota_after_claim is None:
+        # 無法確認扣額結果時，不冒險呼叫 OpenAI。
+        # 嘗試退回一次，避免留下無法確認的扣額。
+        _refund_daily_ai_quota()
+        st.error(
+            "❌ 無法確認 AI 額度狀態，為避免誤扣額度，本次不執行生成。"
+        )
+        st.stop()
+
+    _claimed_used = int(_quota_claim.get("used_count", -1))
+    _verified_used = int(_quota_after_claim.get("used_count", -1))
+
+    if _claimed_used < 1 or _verified_used != _claimed_used:
+        st.error("🔴 全站今日 AI 額度已用完，請明天再試。")
+        st.stop()
+
+    _ai_quota_claimed = True
+
     with st.spinner("AI 正在生成 4×2 原始總圖……"):
         try:
             ib = BytesIO(st.session_state.uploaded_image_bytes)
@@ -1161,6 +1260,12 @@ if st.button("✨ 生成 4×2 八格總圖", type="primary", use_container_width
             st.session_state.generated_4x2_bytes = out.getvalue()
             st.session_state.crop_boxes = None
             st.success("🎉 4×2 原始總圖生成成功！")
+
+            # 生成成功：本次 quota 保留，不退款。
+            # 重新讀取，讓進度表反映所有訪客最新的全站使用量。
+            _fresh_quota = _get_daily_ai_quota()
+            if _fresh_quota is not None:
+                st.session_state["public_last_quota"] = _fresh_quota
 
             # ============================================================
             # 🔎 透明背景診斷：檢查「AI剛生成的原始4×2 PNG」
@@ -1196,7 +1301,17 @@ if st.button("✨ 生成 4×2 八格總圖", type="primary", use_container_width
                 st.info("ℹ️ Alpha 同時存在 0 與 255：這是正常透明 PNG 的典型狀態。")
             elif amin == 0:
                 st.info("ℹ️ 有 Alpha=0，但透明像素分布需要進一步判斷。")
+
         except Exception as e:
+            # OpenAI 已被呼叫但生成失敗：退回本次已取得的額度。
+            _refund_result = _refund_daily_ai_quota()
+            if _refund_result is not None:
+                st.info("↩️ AI 生成失敗，本次 AI 額度已退回。")
+            else:
+                st.warning(
+                    "⚠️ AI 生成失敗，而且系統目前無法確認額度退款狀態；"
+                    "請檢查 Supabase 後再繼續測試。"
+                )
             st.error("❌ 生成失敗")
             st.code(str(e))
 
