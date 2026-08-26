@@ -1,1 +1,1 @@
-# LINE_Sticker_Web_V10_TEST
+# LINE_Sticker_Web_V10
