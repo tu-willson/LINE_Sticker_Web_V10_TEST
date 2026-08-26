@@ -89,21 +89,27 @@ def _public02a_get_settings():
 
 
 def _public02a_apply_settings(data):
+    # Streamlit widget keys cannot be modified after those widgets are instantiated.
+    # Store the imported data as a pending payload; the next script run applies it
+    # before the widgets are created.
     data = _public02a_normalize_settings(data)
-
-    for i in range(1, 11):
-        st.session_state[f"v10_style_custom_{i}"] = data["style_custom"][i - 1]
-        st.session_state[f"v10_style_name_{i}"] = data["style_custom_names"][i - 1]
-
-    for i in range(1, 4):
-        st.session_state[f"v10_character_custom_{i}"] = data["character_custom"][i - 1]
-        st.session_state[f"v10_character_enabled_{i}"] = data["character_enabled"][i - 1]
-
-    st.session_state["public02a_custom_phrases"] = list(data["custom_phrases"])
+    st.session_state["public02a_pending_import"] = data
+    return True
 
 
 def _public02a_init():
     defaults = _public02a_default_settings()
+
+    # Apply an imported profile BEFORE the corresponding Streamlit widgets are instantiated.
+    pending = st.session_state.pop("public02a_pending_import", None)
+    if pending is not None:
+        for i in range(1, 11):
+            st.session_state[f"v10_style_custom_{i}"] = pending["style_custom"][i - 1]
+            st.session_state[f"v10_style_name_{i}"] = pending["style_custom_names"][i - 1]
+        for i in range(1, 4):
+            st.session_state[f"v10_character_custom_{i}"] = pending["character_custom"][i - 1]
+            st.session_state[f"v10_character_enabled_{i}"] = pending["character_enabled"][i - 1]
+        st.session_state["public02a_custom_phrases"] = list(pending["custom_phrases"])
 
     if not st.session_state.get("public02a_initialized", False):
         for i in range(1, 11):
@@ -113,7 +119,6 @@ def _public02a_init():
             st.session_state.setdefault(
                 f"v10_style_name_{i}", defaults["style_custom_names"][i - 1]
             )
-
         for i in range(1, 4):
             st.session_state.setdefault(
                 f"v10_character_custom_{i}", defaults["character_custom"][i - 1]
@@ -121,9 +126,9 @@ def _public02a_init():
             st.session_state.setdefault(
                 f"v10_character_enabled_{i}", defaults["character_enabled"][i - 1]
             )
-
         st.session_state.setdefault("public02a_custom_phrases", [])
         st.session_state["public02a_initialized"] = True
+
 
 
 _public02a_init()
@@ -1367,7 +1372,7 @@ def _public02a_settings_panel():
                 data = json.loads(imported.getvalue().decode("utf-8"))
                 _public02a_apply_settings(data)
                 st.success("✅ 我的設定已匯入")
-                st.info("請重新整理頁面，讓所有欄位同步顯示。")
+                st.rerun()
             except Exception as exc:
                 st.error(f"❌ 匯入失敗：{exc}")
 
