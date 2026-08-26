@@ -465,7 +465,10 @@ def _consume_daily_ai_quota():
 
         # consume function 若沒有取得額度，通常會回傳 remaining=0。
         # 這裡不自行修改資料庫，避免前端繞過 RPC 規則。
+        granted = bool(row.get("granted", False))
+
         return {
+            "granted": granted,
             "used_count": used,
             "remaining": remaining,
             "quota_limit": limit,
@@ -1204,32 +1207,27 @@ if st.button("✨ 生成 4×2 八格總圖", type="primary", use_container_width
         )
         st.stop()
 
+    # FIX2：
+    # consume_daily_ai_quota() 現在會明確回傳 granted。
+    # granted=True 代表「這一次真的取得了 1 次額度」；
+    # granted=False 代表「原本就沒有額度」，絕對不能呼叫 OpenAI。
+    _granted = bool(_quota_claim.get("granted", False))
+
     _remaining_after_claim = int(_quota_claim.get("remaining", 0))
     _limit_after_claim = int(_quota_claim.get("quota_limit", 10))
 
-    # 這裡的 consume RPC 是唯一的扣額來源。
-    # 若 RPC 明確回傳 0 次剩餘，代表本次沒有取得額度。
+    if _limit_after_claim <= 0:
+        st.error("❌ AI 額度設定異常，本次不執行生成。")
+        st.stop()
+
     if _remaining_after_claim < 0 or _remaining_after_claim > _limit_after_claim:
         st.error("❌ AI 額度資料異常，本次不執行生成。")
         st.stop()
 
-    # 若資料庫 function 在「無額度」時回傳 remaining=0，
-    # 仍需要區分「剛好使用完最後 1 次」與「原本就已經 0 次」。
-    # 因此重新讀取一次，確認 consume 後 used_count 是否真的增加。
-    _quota_after_claim = _get_daily_ai_quota()
-    if _quota_after_claim is None:
-        # 無法確認扣額結果時，不冒險呼叫 OpenAI。
-        # 嘗試退回一次，避免留下無法確認的扣額。
-        _refund_daily_ai_quota()
-        st.error(
-            "❌ 無法確認 AI 額度狀態，為避免誤扣額度，本次不執行生成。"
-        )
-        st.stop()
-
-    _claimed_used = int(_quota_claim.get("used_count", -1))
-    _verified_used = int(_quota_after_claim.get("used_count", -1))
-
-    if _claimed_used < 1 or _verified_used != _claimed_used:
+    # 核心攔截：
+    # 沒有真正取得額度時，直接停止 Streamlit 執行。
+    # 後面的 client.images.edit() 因此完全不會被呼叫。
+    if not _granted:
         st.error("🔴 全站今日 AI 額度已用完，請明天再試。")
         st.stop()
 
