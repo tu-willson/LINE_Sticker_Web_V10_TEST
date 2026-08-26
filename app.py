@@ -9,6 +9,8 @@ import random
 from pathlib import Path
 import json
 import hashlib
+import urllib.request
+import urllib.error
 
 # ------------------------------------------------------------
 # V10 使用者資料本／獨立儲存區
@@ -385,6 +387,122 @@ def v10_subsection(title, accent="#4f8cff"):
     )
 
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+
+# ============================================================
+# PUBLIC STEP 02B-2D｜Supabase 全站每日 AI 額度
+# 目前階段：只讀取並顯示全站共同使用量。
+# 不在這一步扣額度，也不改動原本 OpenAI 生成流程。
+#
+# Secrets（Streamlit Cloud）：
+# SUPABASE_URL
+# SUPABASE_SERVICE_ROLE_KEY
+#
+# service_role 只存在伺服器端 st.secrets，不會顯示給訪客。
+# ============================================================
+def _get_daily_ai_quota():
+    """從 Supabase RPC 讀取全站今日額度。失敗時回傳 None。"""
+    try:
+        supabase_url = str(st.secrets["SUPABASE_URL"]).rstrip("/")
+        service_role_key = str(st.secrets["SUPABASE_SERVICE_ROLE_KEY"])
+
+        endpoint = f"{supabase_url}/rest/v1/rpc/get_daily_ai_quota"
+        req = urllib.request.Request(
+            endpoint,
+            data=b"{}",
+            method="POST",
+            headers={
+                "apikey": service_role_key,
+                "Authorization": f"Bearer {service_role_key}",
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            },
+        )
+
+        with urllib.request.urlopen(req, timeout=10) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+
+        # PostgreSQL returns a JSON array for RETURNS TABLE.
+        if isinstance(payload, list):
+            row = payload[0] if payload else {}
+        elif isinstance(payload, dict):
+            row = payload
+        else:
+            return None
+
+        used = int(row.get("used_count", 0))
+        remaining = int(row.get("remaining", 10))
+        limit = int(row.get("quota_limit", 10))
+
+        # 防止資料庫異常值造成 UI 顯示錯誤。
+        limit = max(1, limit)
+        used = max(0, min(used, limit))
+        remaining = max(0, min(remaining, limit))
+
+        return {
+            "used_count": used,
+            "remaining": remaining,
+            "quota_limit": limit,
+        }
+
+    except Exception as exc:
+        # 公開版不要把 Supabase endpoint、secret 或完整錯誤內容顯示給訪客。
+        st.session_state["public_quota_error"] = type(exc).__name__
+        return None
+
+
+def _show_daily_ai_quota():
+    """顯示所有訪客共用的全站每日 AI 使用進度。"""
+    quota = _get_daily_ai_quota()
+
+    st.markdown(
+        """
+        <div style="
+            max-width:820px;
+            margin:10px auto 14px;
+            padding:16px 20px;
+            border:1px solid #3b4658;
+            border-radius:14px;
+            background:linear-gradient(135deg,#151b26,#202938);
+            text-align:center;
+        ">
+            <div style="font-size:22px;font-weight:800;color:#ffffff;">
+                🤖 今日 AI 使用量
+            </div>
+            <div style="font-size:14px;color:#b9c4d4;margin-top:4px;">
+                全站共用每日額度
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    if quota is None:
+        st.warning(
+            "⚠️ 目前無法讀取全站 AI 使用量。"
+            "請確認 Supabase Secrets 已設定正確。"
+        )
+        return None
+
+    used = quota["used_count"]
+    remaining = quota["remaining"]
+    limit = quota["quota_limit"]
+    ratio = used / limit if limit else 0
+
+    c1, c2, c3 = st.columns(3)
+    c1.metric("今日已使用", f"{used} 次")
+    c2.metric("今日剩餘", f"{remaining} 次")
+    c3.metric("每日上限", f"{limit} 次")
+
+    st.progress(ratio)
+
+    if remaining > 0:
+        st.success(f"🟢 全站今日剩餘 **{remaining} 次** AI 生成額度")
+    else:
+        st.error("🔴 全站今日 AI 額度已用完，請明天再試。")
+
+    return quota
+
+
 
 COMMON_PHRASES = [
     "早安","晚安","午安","嗨","哈囉","加油","辛苦了","謝謝",
@@ -1007,6 +1125,10 @@ with st.expander("🔍 點選查看貼圖設定"):
 
 
 v10_section("✨ ⑦ 生成 4×2 原始總圖", "#e67e22")
+
+# PUBLIC STEP 02B-2D：所有訪客共用同一個 Supabase 全站額度。
+_daily_quota = _show_daily_ai_quota()
+
 if st.button("✨ 生成 4×2 八格總圖", type="primary", use_container_width=True):
     if not st.session_state.uploaded_image_bytes:
         st.warning("請先上傳人物照片。")
@@ -1265,7 +1387,7 @@ if st.session_state.generated_4x2_bytes:
             st.error(f"打包失敗：{e}")
     st.caption("V10 STEP 10C.6｜定位點裁切＋邊界連通背景透明化；不改動原本定位點系統。")
 st.divider()
-st.caption("V10 STEP 10C.5｜定位點裁切版")
+st.caption("V10 STEP 10C.5｜定位點裁切版｜Public STEP 02B-2D｜全站 AI 額度顯示")
 
 
 # ─────────────────────────────────────────────
