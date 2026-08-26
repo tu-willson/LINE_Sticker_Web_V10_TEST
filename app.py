@@ -170,24 +170,32 @@ def _load_v10_presets():
 
 
 def _save_v10_presets():
-    # 公開版：只更新目前使用者 Session，不寫入共用檔案。
-    for i in range(1, 11):
-        st.session_state[f"v10_style_custom_{i}"] = st.session_state.get(
-            f"v10_style_custom_{i}", ""
-        )
-        st.session_state[f"v10_style_name_{i}"] = st.session_state.get(
-            f"v10_style_name_{i}", f"使用者自定{i}"
-        )
-
-    for i in range(1, 4):
-        st.session_state[f"v10_character_custom_{i}"] = st.session_state.get(
-            f"v10_character_custom_{i}", ""
-        )
-        st.session_state[f"v10_character_enabled_{i}"] = bool(
-            st.session_state.get(f"v10_character_enabled_{i}", False)
-        )
-
-    return True
+    # 公開版：widget 本身已經把目前輸入值保存在 Session State。
+    # 這裡只讀取並驗證，不再重新寫入 widget 的 Session State key。
+    # 避免 Streamlit 在 widget 建立後禁止修改同一 key 的 StreamlitAPIException。
+    try:
+        _snapshot = {
+            "style_custom": [
+                str(st.session_state.get(f"v10_style_custom_{i}", ""))
+                for i in range(1, 11)
+            ],
+            "style_custom_names": [
+                str(st.session_state.get(f"v10_style_name_{i}", f"使用者自定{i}"))
+                for i in range(1, 11)
+            ],
+            "character_custom": [
+                str(st.session_state.get(f"v10_character_custom_{i}", ""))
+                for i in range(1, 4)
+            ],
+            "character_enabled": [
+                bool(st.session_state.get(f"v10_character_enabled_{i}", False))
+                for i in range(1, 4)
+            ],
+        }
+        st.session_state["public02a_last_preset_snapshot"] = _snapshot
+        return True
+    except Exception:
+        return False
 
 
 # 舊版 v10_data/ 仍保留在專案中，作為備份資料，不由公開版讀寫。
