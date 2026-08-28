@@ -861,10 +861,35 @@ def _v12_current_project():
         st.session_state["v12_current_project"] = project
     return project
 
+
+def _v12_default_project_name():
+    return datetime.now().strftime("LINE貼圖_%Y%m%d_%H%M")
+
+def _v12_normalize_project_name(value):
+    value = str(value or "").strip()
+    return value[:80] if value else ""
+
+def _v12_safe_download_stem(value):
+    value = _v12_normalize_project_name(value) or _v12_default_project_name()
+    value = re.sub(r'[\\/:*?"<>|]+', "_", value)
+    value = re.sub(r"\s+", " ", value).strip(" ._")
+    return value[:80] or _v12_default_project_name()
+
+def _v12_project_name_on_change():
+    project = _v12_current_project()
+    project["project_name"] = _v12_normalize_project_name(
+        st.session_state.get("v12_project_name_input", "")
+    )
+    project["updated_at"] = _v12_now_iso()
+    st.session_state["v12_current_project"] = project
+
 def _v12_project_snapshot():
     """取得目前作品的可保存 metadata 快照；絕不包含 API Key。"""
     project = dict(_v12_current_project())
     project["updated_at"] = _v12_now_iso()
+    project["project_name"] = _v12_normalize_project_name(
+        st.session_state.get("v12_project_name_input", project.get("project_name", ""))
+    )
     project["sticker_texts"] = [
         str(st.session_state.get(f"sticker_text_{i}", ""))
         for i in range(8)
@@ -1022,7 +1047,7 @@ if st.session_state["v12_view"] == "library":
         st.markdown(
             """
             完成一組貼圖後，它會出現在這裡。  
-            下一步會逐步加入「作品名稱、瀏覽器本機暫存、作品縮圖與作品詳情」。
+            目前已加入作品名稱與 Project Metadata 同步；下一步會加入瀏覽器本機暫存、作品縮圖與作品詳情。
             """
         )
 
@@ -2143,6 +2168,23 @@ def _public02a_settings_panel():
 
     c1, c2 = st.columns(2)
     with c1:
+        # ============================================================
+        # V12｜STEP 01A②｜作品名稱
+        # ============================================================
+        st.markdown("---")
+        st.markdown("### 🏷️ 作品名稱")
+        st.caption("此名稱會同時用於「我的作品」紀錄與 ZIP 下載檔案名稱。")
+        st.text_input(
+            "為這組作品命名",
+            key="v12_project_name_input",
+            placeholder="例如：阿土的日常貼圖",
+            max_chars=80,
+            on_change=_v12_project_name_on_change,
+        )
+        _v12_name_preview = _v12_project_snapshot().get("project_name", "")
+        if not _v12_name_preview:
+            st.caption(f"未填寫時，會自動使用：{_v12_default_project_name()}")
+
         st.download_button(
             "📤 匯出我的設定",
             data=export_data,
