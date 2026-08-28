@@ -1,3 +1,4 @@
+# V11｜STEP 02C-3A｜等待進度提示＋180 秒逾時保護
 import re
 import zipfile
 import streamlit as st
@@ -17,6 +18,7 @@ import urllib.error
 # 不放進 app.py 內；只要這些 JSON 檔仍在專案中，更新 app.py 不會清空。
 # 先讀取新的 v10_data/，若尚未建立則相容讀取舊版根目錄 JSON。
 # ------------------------------------------------------------
+import time
 V10_DATA_DIR = Path(__file__).with_name("v10_data")
 V10_DATA_DIR.mkdir(exist_ok=True)
 
@@ -1246,13 +1248,31 @@ else:
 v10_section("✨ ⑧ 生成 4×2 原始總圖", "#e67e22")
 
 # ============================================================
-# V11 STEP 02C-2｜生成按鈕防連點＋生成中鎖定
-# 同一個 Streamlit Session 在真正進入 AI 呼叫後鎖定生成按鈕。
-# 這是前端 / Session 層防護；Supabase quota / RPC / RLS 仍是後端主防線。
+# V11｜STEP 02C-2｜兩階段生成鎖定（正式版）
+#
+# 核心設計：
+# ① 使用者第一次按下生成：只設定 pending lock，立即 st.rerun()
+#    → 本次不呼叫 AI。
+# ② 下一次 rerun：先把真正的 st.button 以 disabled=True 畫出來，
+#    → 此時按鈕已經是不可點擊狀態，再開始 AI 生成。
+# ③ 成功／失敗後解除 lock。
+#
+# 不依賴 JavaScript，不嘗試修改 Streamlit DOM。
+# 後端 Session Lock + Supabase quota / RPC / RLS 仍是安全主防線。
 # ============================================================
+st.session_state.setdefault("v11_generation_pending", False)
 st.session_state.setdefault("v11_generation_in_progress", False)
-_generation_locked = bool(st.session_state.get("v11_generation_in_progress", False))
 
+_generation_pending = bool(st.session_state.get("v11_generation_pending", False))
+_generation_in_progress = bool(st.session_state.get("v11_generation_in_progress", False))
+_generation_locked = _generation_pending or _generation_in_progress
+
+# ------------------------------------------------------------
+# 第一階段：使用者按下按鈕
+# 只做必要的輸入檢查，設定 pending lock，立即 rerun。
+# 這樣下一次畫面重繪時，按鈕會先以 disabled=True 呈現，
+# 然後才進入長時間 AI 工作。
+# ------------------------------------------------------------
 if st.button(
     "🔄 AI 正在生成，請稍候……" if _generation_locked else "✨ 生成 4×2 八格總圖",
     type="primary",
@@ -1263,70 +1283,95 @@ if st.button(
     if not st.session_state.uploaded_image_bytes:
         st.warning("請先上傳人物照片。")
         st.stop()
+
     if not filled:
         st.warning("請至少輸入一格貼圖文字。")
         st.stop()
 
-    # ========================================================
-    # V11 STEP 02B-3A
-    # API 路徑分流：
-    #
-    # A. 網站免費額度：
-    #    先向 Supabase 原子取得 1 次額度，再呼叫你的網站 API。
-    #
-    # B. 使用自己的 OpenAI API：
-    #    不呼叫 consume_daily_ai_quota()，因此不扣全站 10 次。
-    # ========================================================
-    _ai_quota_claimed = False
+    if _api_mode == "🔑 使用自己的 OpenAI API" and not _v11_user_api_key:
+        st.error("❌ 請先輸入自己的 OpenAI API Key。")
+        st.stop()
 
-    if _api_mode == "🔑 使用自己的 OpenAI API":
-        if not _v11_user_api_key:
-            st.error("❌ 請先輸入自己的 OpenAI API Key。")
-            st.stop()
-
-        _generation_client = OpenAI(api_key=_v11_user_api_key)
-
-    else:
-        with st.spinner("正在確認全站 AI 額度……"):
-            _quota_claim = _consume_daily_ai_quota()
-
-        if _quota_claim is None:
-            st.error(
-                "❌ 目前無法確認全站 AI 額度，因此為了保護系統與 API 費用，"
-                "本次不會執行 AI 生成。請稍後再試。"
-            )
-            st.stop()
-
-        _granted = bool(_quota_claim.get("granted", False))
-        _remaining_after_claim = int(_quota_claim.get("remaining", 0))
-        _limit_after_claim = int(_quota_claim.get("quota_limit", 10))
-
-        if _limit_after_claim <= 0:
-            st.error("❌ AI 額度設定異常，本次不執行生成。")
-            st.stop()
-
-        if _remaining_after_claim < 0 or _remaining_after_claim > _limit_after_claim:
-            st.error("❌ AI 額度資料異常，本次不執行生成。")
-            st.stop()
-
-        if not _granted:
-            st.error("🔴 全站今日 AI 額度已用完，請明天再試。")
-            st.stop()
-
-        _ai_quota_claimed = True
-        _generation_client = client
-
-    # 02C-2：所有前置檢查（照片、文字、API Key、網站額度）都通過後，
-    # 才取得 Session 鎖。避免錯誤情況造成按鈕永久鎖定。
-    st.session_state["v11_generation_in_progress"] = True
+    # 先鎖定，再立即重新繪製畫面；本次不呼叫 AI。
+    st.session_state["v11_generation_pending"] = True
     st.session_state["v11_generation_started_at"] = __import__("time").time()
+    st.rerun()
+
+# ------------------------------------------------------------
+# 第二階段：只有 pending lock 存在時才進入真正生成。
+# 此時上面的 st.button 已經先以 disabled=True 呈現。
+# 因此使用者看到的是「不可按」的生成中按鈕，再開始 AI 工作。
+# ------------------------------------------------------------
+if st.session_state.get("v11_generation_pending", False):
+    st.session_state["v11_generation_pending"] = False
+    st.session_state["v11_generation_in_progress"] = True
+    _generation_locked = True
 
     st.info("🔒 AI 生成進行中，本次操作已鎖定，請稍候……")
 
-    with st.spinner("AI 正在生成 4×2 原始總圖……"):
-        try:
+    # ========================================================
+    # V11 STEP 02B-3A
+    # API 路徑分流：
+    # A. 網站免費額度：先原子取得 1 次額度，再呼叫網站 API。
+    # B. 使用自己的 OpenAI API：不扣網站每日 10 次額度。
+    # ========================================================
+    _ai_quota_claimed = False
+
+    try:
+        if _api_mode == "🔑 使用自己的 OpenAI API":
+            if not _v11_user_api_key:
+                st.error("❌ 請先輸入自己的 OpenAI API Key。")
+                raise RuntimeError("missing_user_api_key")
+
+            _generation_client = OpenAI(api_key=_v11_user_api_key)
+
+        else:
+            with st.spinner("正在確認全站 AI 額度……"):
+                _quota_claim = _consume_daily_ai_quota()
+
+            if _quota_claim is None:
+                st.error(
+                    "❌ 目前無法確認全站 AI 額度，因此為了保護系統與 API 費用，"
+                    "本次不會執行 AI 生成。請稍後再試。"
+                )
+                raise RuntimeError("quota_unavailable")
+
+            _granted = bool(_quota_claim.get("granted", False))
+            _remaining_after_claim = int(_quota_claim.get("remaining", 0))
+            _limit_after_claim = int(_quota_claim.get("quota_limit", 10))
+
+            if _limit_after_claim <= 0:
+                st.error("❌ AI 額度設定異常，本次不執行生成。")
+                raise RuntimeError("invalid_quota_limit")
+
+            if _remaining_after_claim < 0 or _remaining_after_claim > _limit_after_claim:
+                st.error("❌ AI 額度資料異常，本次不執行生成。")
+                raise RuntimeError("invalid_quota_remaining")
+
+            if not _granted:
+                st.error("🔴 全站今日 AI 額度已用完，請明天再試。")
+                raise RuntimeError("quota_exhausted")
+
+            _ai_quota_claimed = True
+            _generation_client = client
+
+        with st.spinner("AI 正在生成 4×2 原始總圖……"):
             ib = BytesIO(st.session_state.uploaded_image_bytes)
-            result = _generation_client.images.edit(
+            # V11｜STEP 02C-3A
+            # 等待提示是「等待體驗」，不代表 OpenAI 真實完成百分比。
+            # 180 秒後逾時；不自動 retry，沿用原本的例外／退款路徑。
+            _progress = st.progress(0)
+            _status = st.empty()
+            _started_at = time.monotonic()
+            _progress.progress(0.05)
+            _status.info("🎨 正在分析你的照片……")
+
+            try:
+                _progress.progress(0.18)
+                _status.info("🖌️ 正在準備貼圖構圖……")
+
+                # OpenAI SDK timeout：最長等待 180 秒。
+                result = _generation_client.with_options(timeout=180).images.edit(
                 model="gpt-image-2",
                 image=("person.png", ib, "image/png"),
                 prompt=(
@@ -1341,6 +1386,18 @@ if st.button(
                 background="transparent",
                 output_format="png",
             )
+
+                _progress.progress(0.88)
+                _status.info("🖼️ 原始總圖處理中……")
+                _progress.progress(0.96)
+                _status.info("✂️ 正在準備 8 張貼圖……")
+                _progress.progress(1.0)
+                _status.success("🎉 AI 生成完成，正在進行最後圖片處理……")
+            except Exception as _gen_exc:
+                _elapsed = time.monotonic() - _started_at
+                if _elapsed >= 180:
+                    raise TimeoutError("AI 生成逾時（超過 3 分鐘），請重新操作。") from _gen_exc
+                raise
             raw = base64.b64decode(result.data[0].b64_json)
             img = Image.open(BytesIO(raw)).convert("RGBA")
             out = BytesIO()
@@ -1350,13 +1407,12 @@ if st.button(
             st.success("🎉 4×2 原始總圖生成成功！")
 
             # 生成成功：本次 quota 保留，不退款。
-            # 重新讀取，讓進度表反映所有訪客最新的全站使用量。
             _fresh_quota = _get_daily_ai_quota()
             if _fresh_quota is not None:
                 st.session_state["public_last_quota"] = _fresh_quota
 
             # ============================================================
-            # 🔎 透明背景診斷：檢查「AI剛生成的原始4×2 PNG」
+            # 透明背景診斷：檢查 AI 剛生成的原始 4×2 PNG
             # ============================================================
             alpha = img.getchannel("A")
             amin, amax = alpha.getextrema()
@@ -1390,33 +1446,39 @@ if st.button(
             elif amin == 0:
                 st.info("ℹ️ 有 Alpha=0，但透明像素分布需要進一步判斷。")
 
-        except Exception as e:
-            # 只有網站免費額度模式才需要退款。
-            # 使用者自己的 API 是使用者自己的帳務，不涉及網站額度。
-            if _api_mode == "🆓 使用網站免費額度" and _ai_quota_claimed:
-                _refund_result = _refund_daily_ai_quota()
-                if _refund_result is not None:
-                    st.info("↩️ AI 生成失敗，本次網站 AI 額度已退回。")
-                else:
-                    st.warning(
-                        "⚠️ AI 生成失敗，而且系統目前無法確認額度退款狀態；"
-                        "請檢查 Supabase 後再繼續測試。"
-                    )
+    except Exception as e:
+        # 只有網站免費額度模式且已成功扣額度時才退款。
+        # 使用者自己的 API 不涉及網站額度。
+        if _api_mode == "🆓 使用網站免費額度" and _ai_quota_claimed:
+            _refund_result = _refund_daily_ai_quota()
+            if _refund_result is not None:
+                st.info("↩️ AI 生成失敗，本次網站 AI 額度已退回。")
             else:
-                st.info(
-                    "ℹ️ 這次使用的是你自己的 OpenAI API；"
-                    "沒有扣除網站每日 10 次額度，因此不需要網站額度退款。"
+                st.warning(
+                    "⚠️ AI 生成失敗，而且系統目前無法確認額度退款狀態；"
+                    "請檢查 Supabase 後再繼續測試。"
                 )
+        elif str(e) not in {"missing_user_api_key", "quota_unavailable", "invalid_quota_limit", "invalid_quota_remaining", "quota_exhausted"}:
+            st.info(
+                "ℹ️ 這次使用的是你自己的 OpenAI API；"
+                "沒有扣除網站每日 10 次額度，因此不需要網站額度退款。"
+            )
+
+        # 前面若已顯示明確的額度／Key 錯誤，就不要重複顯示「生成失敗」。
+        if str(e) not in {"missing_user_api_key", "quota_unavailable", "invalid_quota_limit", "invalid_quota_remaining", "quota_exhausted"}:
             st.error("❌ 生成失敗")
-            # 不顯示完整例外內容，避免第三方 SDK 的錯誤訊息意外帶出敏感資訊。
             st.caption(f"錯誤類型：{type(e).__name__}")
 
-    # 成功或失敗都解除鎖定；下一次 Streamlit rerun 即可再次生成。
-    st.session_state["v11_generation_in_progress"] = False
-    st.session_state["v11_generation_finished_at"] = __import__("time").time()
+    finally:
+        # 成功、失敗、額度不足、例外都解除鎖定。
+        # 下一次正常 rerun 時，生成按鈕恢復可用。
+        st.session_state["v11_generation_in_progress"] = False
+        st.session_state["v11_generation_pending"] = False
+        st.session_state["v11_generation_finished_at"] = __import__("time").time()
 
 # ------------------------------------------------------------
 # STEP 10C native component
+# ------------------------------------------------------------
 # ------------------------------------------------------------
 if st.session_state.generated_4x2_bytes:
     st.divider()
