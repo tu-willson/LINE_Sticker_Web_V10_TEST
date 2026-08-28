@@ -1245,9 +1245,21 @@ else:
 
 v10_section("✨ ⑧ 生成 4×2 原始總圖", "#e67e22")
 
+# ============================================================
+# V11 STEP 02C-2｜生成按鈕防連點＋生成中鎖定
+# 同一個 Streamlit Session 在真正進入 AI 呼叫後鎖定生成按鈕。
+# 這是前端 / Session 層防護；Supabase quota / RPC / RLS 仍是後端主防線。
+# ============================================================
+st.session_state.setdefault("v11_generation_in_progress", False)
+_generation_locked = bool(st.session_state.get("v11_generation_in_progress", False))
 
-
-if st.button("✨ 生成 4×2 八格總圖", type="primary", use_container_width=True):
+if st.button(
+    "🔄 AI 正在生成，請稍候……" if _generation_locked else "✨ 生成 4×2 八格總圖",
+    type="primary",
+    use_container_width=True,
+    disabled=_generation_locked,
+    key="v11_generate_4x2",
+):
     if not st.session_state.uploaded_image_bytes:
         st.warning("請先上傳人物照片。")
         st.stop()
@@ -1303,6 +1315,13 @@ if st.button("✨ 生成 4×2 八格總圖", type="primary", use_container_width
 
         _ai_quota_claimed = True
         _generation_client = client
+
+    # 02C-2：所有前置檢查（照片、文字、API Key、網站額度）都通過後，
+    # 才取得 Session 鎖。避免錯誤情況造成按鈕永久鎖定。
+    st.session_state["v11_generation_in_progress"] = True
+    st.session_state["v11_generation_started_at"] = __import__("time").time()
+
+    st.info("🔒 AI 生成進行中，本次操作已鎖定，請稍候……")
 
     with st.spinner("AI 正在生成 4×2 原始總圖……"):
         try:
@@ -1391,6 +1410,10 @@ if st.button("✨ 生成 4×2 八格總圖", type="primary", use_container_width
             st.error("❌ 生成失敗")
             # 不顯示完整例外內容，避免第三方 SDK 的錯誤訊息意外帶出敏感資訊。
             st.caption(f"錯誤類型：{type(e).__name__}")
+
+    # 成功或失敗都解除鎖定；下一次 Streamlit rerun 即可再次生成。
+    st.session_state["v11_generation_in_progress"] = False
+    st.session_state["v11_generation_finished_at"] = __import__("time").time()
 
 # ------------------------------------------------------------
 # STEP 10C native component
