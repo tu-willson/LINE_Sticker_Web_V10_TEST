@@ -227,7 +227,7 @@ import streamlit.components.v1 as components
 # ============================================================
 
 st.set_page_config(
-    page_title="LINE 貼圖創作工作室",
+    page_title="LINE 貼圖創作工作室｜V11",
     page_icon="🎨",
     layout="wide",
 )
@@ -657,7 +657,7 @@ st.markdown("""<style>
 </style>""",unsafe_allow_html=True)
 
 st.markdown('<div class="v10-main-title">🎨 LINE 貼圖創作工作室</div>', unsafe_allow_html=True)
-st.caption("V10 STEP 10C｜原生 Canvas 直接拖曳裁切")
+st.caption("V11 STEP 02B-3A｜使用者自有 OpenAI API Session 安全架構")
 st.divider()
 
 v10_section("📷 ① 上傳人物照片", "#ff5c7a")
@@ -1174,10 +1174,78 @@ with st.expander("🔍 點選查看貼圖設定"):
         st.info("目前尚未產生 AI Prompt。")
 
 
-v10_section("✨ ⑦ 生成 4×2 原始總圖", "#e67e22")
 
-# PUBLIC STEP 02B-2D：所有訪客共用同一個 Supabase 全站額度。
-_daily_quota = _show_daily_ai_quota()
+# ============================================================
+# V11 STEP 02B-3A｜使用者自有 OpenAI API
+#
+# 安全原則：
+# 1. 預設仍使用網站免費額度。
+# 2. 使用者選擇「自己的 OpenAI API」後，不扣全站 10 次。
+# 3. API Key 僅放在目前 Streamlit Session。
+# 4. 不寫入 Supabase / JSON / GitHub / Streamlit Secrets。
+# 5. 預設隱碼；可由使用者自行切換顯示。
+# ============================================================
+v10_section("🔑 ⑦ AI API 使用方式", "#6366f1")
+
+_api_mode = st.radio(
+    "選擇 AI 生成方式",
+    [
+        "🆓 使用網站免費額度",
+        "🔑 使用自己的 OpenAI API",
+    ],
+    key="v11_api_mode",
+    horizontal=False,
+)
+
+_v11_user_api_key = ""
+
+if _api_mode == "🔑 使用自己的 OpenAI API":
+    st.info(
+        "🔐 **隱私提醒**\n\n"
+        "你的 OpenAI API Key 是高度敏感的私人資訊。"
+        "請只輸入你自己的 Key，**不要輸入別人的 Key，也不要把 Key 分享給任何人**。\n\n"
+        "本網站設計上不會把這組 Key 寫入 Supabase、使用量資料表、JSON 設定檔、GitHub 或網站的永久 Secrets；"
+        "它只供目前這個瀏覽器 Session 暫時使用。"
+    )
+
+    _show_v11_key = st.checkbox(
+        "👁️ 顯示 API Key（再次點擊即可隱藏）",
+        value=False,
+        key="v11_show_api_key",
+        help="為安全起見，預設以 •••••••• 隱碼顯示。",
+    )
+
+    _v11_user_api_key = st.text_input(
+        "OpenAI API Key",
+        type="default" if _show_v11_key else "password",
+        placeholder="sk-••••••••••••••••••••",
+        key="v11_user_api_key",
+        help="只在本次 Session 使用；請勿將 API Key 貼到公開聊天室或程式碼中。",
+    ).strip()
+
+    if _v11_user_api_key:
+        st.success(
+            "🔒 已取得本次 Session 的 API Key。"
+            "使用「自己的 API」時，不會扣除網站全站每日 10 次額度。"
+        )
+    else:
+        st.warning("⚠️ 目前尚未輸入自己的 API Key；請輸入後才能使用此模式。")
+
+    st.caption(
+        "💡 安全建議：完成使用後，可關閉瀏覽器分頁／Session，並在 OpenAI 帳號的 API Keys 頁面定期檢查與撤銷不再使用的 Key。"
+    )
+
+else:
+    st.caption(
+        "🆓 目前使用網站提供的全站每日免費額度。"
+        "所有訪客共用每日 10 次；成功生成才會保留扣除，生成失敗會退款。"
+    )
+
+v10_section("✨ ⑧ 生成 4×2 原始總圖", "#e67e22")
+
+
+# V11：只有「網站免費額度」模式需要讀取全站額度。
+_daily_quota = _show_daily_ai_quota() if _api_mode == "🆓 使用網站免費額度" else None
 
 if st.button("✨ 生成 4×2 八格總圖", type="primary", use_container_width=True):
     if not st.session_state.uploaded_image_bytes:
@@ -1188,55 +1256,58 @@ if st.button("✨ 生成 4×2 八格總圖", type="primary", use_container_width
         st.stop()
 
     # ========================================================
-    # PUBLIC STEP 02B-2E
-    # 真正扣除「全站每日 10 次」額度。
+    # V11 STEP 02B-3A
+    # API 路徑分流：
     #
-    # 原則：
-    # 1. 額度檢查/扣除在 OpenAI 呼叫之前。
-    # 2. 沒有額度：直接停止，絕不呼叫 OpenAI。
-    # 3. OpenAI 成功：保留本次額度。
-    # 4. OpenAI 失敗：退回本次額度。
+    # A. 網站免費額度：
+    #    先向 Supabase 原子取得 1 次額度，再呼叫你的網站 API。
+    #
+    # B. 使用自己的 OpenAI API：
+    #    不呼叫 consume_daily_ai_quota()，因此不扣全站 10 次。
     # ========================================================
-    with st.spinner("正在確認全站 AI 額度……"):
-        _quota_claim = _consume_daily_ai_quota()
+    _ai_quota_claimed = False
 
-    if _quota_claim is None:
-        st.error(
-            "❌ 目前無法確認全站 AI 額度，因此為了保護系統與 API 費用，"
-            "本次不會執行 AI 生成。請稍後再試。"
-        )
-        st.stop()
+    if _api_mode == "🔑 使用自己的 OpenAI API":
+        if not _v11_user_api_key:
+            st.error("❌ 請先輸入自己的 OpenAI API Key。")
+            st.stop()
 
-    # FIX2：
-    # consume_daily_ai_quota() 現在會明確回傳 granted。
-    # granted=True 代表「這一次真的取得了 1 次額度」；
-    # granted=False 代表「原本就沒有額度」，絕對不能呼叫 OpenAI。
-    _granted = bool(_quota_claim.get("granted", False))
+        _generation_client = OpenAI(api_key=_v11_user_api_key)
 
-    _remaining_after_claim = int(_quota_claim.get("remaining", 0))
-    _limit_after_claim = int(_quota_claim.get("quota_limit", 10))
+    else:
+        with st.spinner("正在確認全站 AI 額度……"):
+            _quota_claim = _consume_daily_ai_quota()
 
-    if _limit_after_claim <= 0:
-        st.error("❌ AI 額度設定異常，本次不執行生成。")
-        st.stop()
+        if _quota_claim is None:
+            st.error(
+                "❌ 目前無法確認全站 AI 額度，因此為了保護系統與 API 費用，"
+                "本次不會執行 AI 生成。請稍後再試。"
+            )
+            st.stop()
 
-    if _remaining_after_claim < 0 or _remaining_after_claim > _limit_after_claim:
-        st.error("❌ AI 額度資料異常，本次不執行生成。")
-        st.stop()
+        _granted = bool(_quota_claim.get("granted", False))
+        _remaining_after_claim = int(_quota_claim.get("remaining", 0))
+        _limit_after_claim = int(_quota_claim.get("quota_limit", 10))
 
-    # 核心攔截：
-    # 沒有真正取得額度時，直接停止 Streamlit 執行。
-    # 後面的 client.images.edit() 因此完全不會被呼叫。
-    if not _granted:
-        st.error("🔴 全站今日 AI 額度已用完，請明天再試。")
-        st.stop()
+        if _limit_after_claim <= 0:
+            st.error("❌ AI 額度設定異常，本次不執行生成。")
+            st.stop()
 
-    _ai_quota_claimed = True
+        if _remaining_after_claim < 0 or _remaining_after_claim > _limit_after_claim:
+            st.error("❌ AI 額度資料異常，本次不執行生成。")
+            st.stop()
+
+        if not _granted:
+            st.error("🔴 全站今日 AI 額度已用完，請明天再試。")
+            st.stop()
+
+        _ai_quota_claimed = True
+        _generation_client = client
 
     with st.spinner("AI 正在生成 4×2 原始總圖……"):
         try:
             ib = BytesIO(st.session_state.uploaded_image_bytes)
-            result = client.images.edit(
+            result = _generation_client.images.edit(
                 model="gpt-image-2",
                 image=("person.png", ib, "image/png"),
                 prompt=(
@@ -1301,17 +1372,25 @@ if st.button("✨ 生成 4×2 八格總圖", type="primary", use_container_width
                 st.info("ℹ️ 有 Alpha=0，但透明像素分布需要進一步判斷。")
 
         except Exception as e:
-            # OpenAI 已被呼叫但生成失敗：退回本次已取得的額度。
-            _refund_result = _refund_daily_ai_quota()
-            if _refund_result is not None:
-                st.info("↩️ AI 生成失敗，本次 AI 額度已退回。")
+            # 只有網站免費額度模式才需要退款。
+            # 使用者自己的 API 是使用者自己的帳務，不涉及網站額度。
+            if _api_mode == "🆓 使用網站免費額度" and _ai_quota_claimed:
+                _refund_result = _refund_daily_ai_quota()
+                if _refund_result is not None:
+                    st.info("↩️ AI 生成失敗，本次網站 AI 額度已退回。")
+                else:
+                    st.warning(
+                        "⚠️ AI 生成失敗，而且系統目前無法確認額度退款狀態；"
+                        "請檢查 Supabase 後再繼續測試。"
+                    )
             else:
-                st.warning(
-                    "⚠️ AI 生成失敗，而且系統目前無法確認額度退款狀態；"
-                    "請檢查 Supabase 後再繼續測試。"
+                st.info(
+                    "ℹ️ 這次使用的是你自己的 OpenAI API；"
+                    "沒有扣除網站每日 10 次額度，因此不需要網站額度退款。"
                 )
             st.error("❌ 生成失敗")
-            st.code(str(e))
+            # 不顯示完整例外內容，避免第三方 SDK 的錯誤訊息意外帶出敏感資訊。
+            st.caption(f"錯誤類型：{type(e).__name__}")
 
 # ------------------------------------------------------------
 # STEP 10C native component
@@ -1498,9 +1577,9 @@ if st.session_state.generated_4x2_bytes:
             )
         except Exception as e:
             st.error(f"打包失敗：{e}")
-    st.caption("V10 STEP 10C.6｜定位點裁切＋邊界連通背景透明化；不改動原本定位點系統。")
+    st.caption("V11｜STEP 02B-3A｜自有 API Session＋隱碼保護；沿用既有定位點裁切系統。")
 st.divider()
-st.caption("V10 STEP 10C.5｜定位點裁切版｜Public STEP 02B-2D｜全站 AI 額度顯示")
+st.caption("V11｜STEP 02B-3A｜自有 API Session＋隱碼保護")
 
 
 # ─────────────────────────────────────────────
