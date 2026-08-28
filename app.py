@@ -203,6 +203,35 @@ def _public02a_set_preset_store(data):
     }
 
 
+def _public02a_sync_style_slot(slot: int):
+    """Sync one custom-style editor slot into the durable non-widget preset store."""
+    try:
+        slot = int(slot)
+        if not 1 <= slot <= 10:
+            return
+
+        current = _public02a_get_preset_store()
+        name_key = f"v10_style_name_{slot}"
+        style_key = f"v10_style_custom_{slot}"
+
+        # Only update fields that actually exist. This prevents a conditional
+        # Streamlit widget disappearing from erasing previously saved content.
+        if name_key in st.session_state:
+            name = str(st.session_state[name_key]).strip()
+            current["style_custom_names"][slot - 1] = name or f"使用者自定{slot}"
+
+        if style_key in st.session_state:
+            current["style_custom"][slot - 1] = str(
+                st.session_state[style_key]
+            ).strip()
+
+        _public02a_set_preset_store(current)
+        st.session_state["public02a_last_preset_snapshot"] = _public02a_get_preset_store()
+    except Exception:
+        # A sync failure must never break the creation page UI.
+        pass
+
+
 def _load_v10_presets():
     return _public02a_get_preset_store()
 
@@ -1371,11 +1400,26 @@ if style_mode=="⭐ 自定義風格":
         for _i in range(1,11):
             _a,_b=st.columns([1,4])
             with _a:
-                st.text_input(f"名稱 {_i:02d}",key=f"v10_style_name_{_i}")
+                st.text_input(
+                    f"名稱 {_i:02d}",
+                    key=f"v10_style_name_{_i}",
+                    on_change=_public02a_sync_style_slot,
+                    args=(_i,),
+                )
             with _b:
-                st.text_area(f"自定義風格 {_i:02d}",key=f"v10_style_custom_{_i}",height=65)
+                st.text_area(
+                    f"自定義風格 {_i:02d}",
+                    key=f"v10_style_custom_{_i}",
+                    height=65,
+                    on_change=_public02a_sync_style_slot,
+                    args=(_i,),
+                )
 
         if st.button("💾 儲存 10 組自定風格",key="v10_save_styles",use_container_width=True):
+            # FIX7：先逐格同步至 durable store，再做完整快照保存。
+            for _sync_i in range(1, 11):
+                _public02a_sync_style_slot(_sync_i)
+
             if _save_v10_presets():
                 st.success("✅ 10 組自定風格已儲存")
                 st.rerun()
