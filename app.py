@@ -1,4 +1,4 @@
-# V11｜STEP 02C-3D｜等待進度提示＋180 秒逾時保護
+# V11｜STEP 02C-4②｜等待進度提示＋180 秒逾時保護
 import re
 import zipfile
 import streamlit as st
@@ -1431,7 +1431,7 @@ if st.session_state.get("v11_generation_pending", False):
 
         with st.spinner("AI 正在生成 4×2 原始總圖……"):
             ib = BytesIO(st.session_state.uploaded_image_bytes)
-            # V11｜STEP 02C-3A
+            # V11｜STEP 02C-4②
             # 等待提示是「等待體驗」，不代表 OpenAI 真實完成百分比。
             # 180 秒後逾時；不自動 retry，沿用原本的例外／退款路徑。
             _progress = st.progress(0)
@@ -1460,6 +1460,17 @@ if st.session_state.get("v11_generation_pending", False):
                 background="transparent",
                 output_format="png",
             )
+
+                # V11｜02C-4②｜異常回應資料防護
+                # API 呼叫成功不代表一定取得有效圖片；空 data / 缺少 b64_json
+                # 必須視為生成失敗，交回原本的 exception / refund 流程。
+                if not getattr(result, "data", None):
+                    raise RuntimeError("AI 回應成功，但沒有取得有效圖片資料，請重新操作。")
+                
+                _image_item = result.data[0]
+                _b64_json = getattr(_image_item, "b64_json", None)
+                if not _b64_json:
+                    raise RuntimeError("AI 回應成功，但圖片資料不完整，請重新操作。")
 
                 _progress.progress(0.88)
                 _status.info("🖼️ 原始總圖處理中……")
