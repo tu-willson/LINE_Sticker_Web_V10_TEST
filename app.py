@@ -103,11 +103,34 @@ def _public02a_apply_settings(data):
 
 
 def _public02a_init():
-    defaults = _public02a_default_settings()
+    # V12 FIX4：非 Widget 的個人設定 store。
+    # 公開版不能直接把所有訪客資料寫進共用 v10_data，
+    # 因此同一位使用者的 Session 以 public02a_user_presets 作為可靠來源。
+    st.session_state.setdefault(
+        "public02a_user_presets",
+        {
+            "style_custom": [""] * 10,
+            "style_custom_names": [f"使用者自定{i}" for i in range(1, 11)],
+            "character_custom": ["", "", ""],
+            "character_enabled": [False, False, False],
+        },
+    )
+
+    defaults = _public02a_normalize_settings(
+        st.session_state.get("public02a_user_presets")
+    )
 
     # Apply an imported profile BEFORE the corresponding Streamlit widgets are instantiated.
     pending = st.session_state.pop("public02a_pending_import", None)
     if pending is not None:
+        pending = _public02a_normalize_settings(pending)
+        st.session_state["public02a_user_presets"] = {
+            "style_custom": list(pending["style_custom"]),
+            "style_custom_names": list(pending["style_custom_names"]),
+            "character_custom": list(pending["character_custom"]),
+            "character_enabled": list(pending["character_enabled"]),
+        }
+        defaults = pending
         for i in range(1, 11):
             st.session_state[f"v10_style_custom_{i}"] = pending["style_custom"][i - 1]
             st.session_state[f"v10_style_name_{i}"] = pending["style_custom_names"][i - 1]
@@ -157,94 +180,35 @@ def _save_v10_phrase_pool(values):
     return True
 
 
+def _public02a_get_preset_store():
+    data = st.session_state.get("public02a_user_presets")
+    return _public02a_normalize_settings(data)
+
+
+def _public02a_set_preset_store(data):
+    normalized = _public02a_normalize_settings(data)
+    st.session_state["public02a_user_presets"] = {
+        "style_custom": list(normalized["style_custom"]),
+        "style_custom_names": list(normalized["style_custom_names"]),
+        "character_custom": list(normalized["character_custom"]),
+        "character_enabled": list(normalized["character_enabled"]),
+    }
+
+
 def _load_v10_presets():
-    # 公開版：不讀取共用 v10_data，避免不同使用者互相看到資料。
-    return {
-        "style_custom": [
-            st.session_state.get(f"v10_style_custom_{i}", "")
-            for i in range(1, 11)
-        ],
-        "style_custom_names": [
-            st.session_state.get(f"v10_style_name_{i}", f"使用者自定{i}")
-            for i in range(1, 11)
-        ],
-        "character_custom": [
-            st.session_state.get(f"v10_character_custom_{i}", "")
-            for i in range(1, 4)
-        ],
-        "character_enabled": [
-            bool(st.session_state.get(f"v10_character_enabled_{i}", False))
-            for i in range(1, 4)
-        ],
-    }
+    return _public02a_get_preset_store()
 
-
-def _v12_snapshot_custom_style_widgets():
-    """在離開「開始製作」頁前，備份自定義風格到非 widget Session key。
-    Streamlit 在某個 widget 暫時不被渲染時，可能清除該 widget key；
-    因此不能只依賴 v10_style_* widget key。
-    """
-    snapshot = {
-        "style_custom": [
-            str(st.session_state.get(f"v10_style_custom_{i}", ""))
-            for i in range(1, 11)
-        ],
-        "style_custom_names": [
-            str(st.session_state.get(f"v10_style_name_{i}", f"使用者自定{i}"))
-            for i in range(1, 11)
-        ],
-    }
-    st.session_state["v12_custom_style_backup"] = snapshot
-
-def _v12_restore_custom_style_widgets():
-    """回到「開始製作」頁時，將備份還原到 widget key。"""
-    snapshot = st.session_state.get("v12_custom_style_backup")
-    if not isinstance(snapshot, dict):
-        return
-
-    names = list(snapshot.get("style_custom_names") or [])
-    styles = list(snapshot.get("style_custom") or [])
-
-    for i in range(1, 11):
-        if i - 1 < len(names):
-            st.session_state.setdefault(
-                f"v10_style_name_{i}",
-                str(names[i - 1]),
-            )
-        if i - 1 < len(styles):
-            st.session_state.setdefault(
-                f"v10_style_custom_{i}",
-                str(styles[i - 1]),
-            )
 
 def _save_v10_presets():
-    # 公開版：widget 本身已經把目前輸入值保存在 Session State。
-    # 這裡只讀取並驗證，不再重新寫入 widget 的 Session State key。
-    # 避免 Streamlit 在 widget 建立後禁止修改同一 key 的 StreamlitAPIException。
     try:
-        _snapshot = {
-            "style_custom": [
-                str(st.session_state.get(f"v10_style_custom_{i}", ""))
-                for i in range(1, 11)
-            ],
-            "style_custom_names": [
-                str(st.session_state.get(f"v10_style_name_{i}", f"使用者自定{i}"))
-                for i in range(1, 11)
-            ],
-            "character_custom": [
-                str(st.session_state.get(f"v10_character_custom_{i}", ""))
-                for i in range(1, 4)
-            ],
-            "character_enabled": [
-                bool(st.session_state.get(f"v10_character_enabled_{i}", False))
-                for i in range(1, 4)
-            ],
+        snapshot = {
+            "style_custom": [str(st.session_state.get(f"v10_style_custom_{i}", "")) for i in range(1, 11)],
+            "style_custom_names": [str(st.session_state.get(f"v10_style_name_{i}", f"使用者自定{i}")) for i in range(1, 11)],
+            "character_custom": [str(st.session_state.get(f"v10_character_custom_{i}", "")) for i in range(1, 4)],
+            "character_enabled": [bool(st.session_state.get(f"v10_character_enabled_{i}", False)) for i in range(1, 4)],
         }
-        st.session_state["public02a_last_preset_snapshot"] = _snapshot
-        st.session_state["v12_custom_style_backup"] = {
-            "style_custom": list(_snapshot["style_custom"]),
-            "style_custom_names": list(_snapshot["style_custom_names"]),
-        }
+        _public02a_set_preset_store(snapshot)
+        st.session_state["public02a_last_preset_snapshot"] = _public02a_get_preset_store()
         return True
     except Exception:
         return False
@@ -1166,8 +1130,8 @@ with _v12_nav_cols[0]:
         st.rerun()
 with _v12_nav_cols[1]:
     if st.button("📚 我的作品", key="v12_nav_library", use_container_width=True):
-        # 離開創作頁前，先備份目前自定義風格。
-        _v12_snapshot_custom_style_widgets()
+        # 離開創作頁前同步目前自定義風格到非 Widget 個人設定 store。
+        _save_v10_presets()
         st.session_state["v12_view"] = "library"
         st.rerun()
 
@@ -1272,9 +1236,6 @@ if st.session_state["v12_view"] == "library":
     st.caption(f"V12｜STEP 01A③｜目前最多暫存 {V12_HISTORY_LIMIT} 組作品，不保存 API Key，也不寫入網站每日 AI 額度資料。")
     st.stop()
 
-
-# V12｜01A③ FIX2：從「我的作品」返回時先恢復自定義風格。
-_v12_restore_custom_style_widgets()
 
 st.markdown('<div class="v10-main-title">🎨 LINE 貼圖創作工作室</div>', unsafe_allow_html=True)
 st.caption("V11｜公開版｜快速完成 LINE 貼圖創作")
