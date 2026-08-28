@@ -1185,34 +1185,40 @@ with st.expander("🔍 點選查看貼圖設定"):
 # 4. 不寫入 Supabase / JSON / GitHub / Streamlit Secrets。
 # 5. 預設隱碼；可由使用者自行切換顯示。
 # ============================================================
-v10_section("🔑 ⑦ AI API 使用方式", "#6366f1")
+v10_section("🤖 ⑦ AI 生成方式", "#6366f1")
 
 _api_mode = st.radio(
-    "選擇 AI 生成方式",
+    "請選擇生成方式",
     [
         "🆓 使用網站免費額度",
         "🔑 使用自己的 OpenAI API",
     ],
     key="v11_api_mode",
-    horizontal=False,
 )
 
 _v11_user_api_key = ""
 
-if _api_mode == "🔑 使用自己的 OpenAI API":
+if _api_mode == "🆓 使用網站免費額度":
+    st.caption(
+        "🎁 使用網站提供的免費額度，所有訪客共用每日 10 次。"
+    )
+    _daily_quota = _show_daily_ai_quota()
+
+else:
+    st.caption(
+        "💡 適合需要較多生成次數的使用者；使用自己的 API 時，"
+        "不受網站每日 10 次額度限制。"
+    )
+
     st.info(
         "🔐 **隱私提醒**\n\n"
-        "你的 OpenAI API Key 是高度敏感的私人資訊。"
-        "請只輸入你自己的 Key，**不要輸入別人的 Key，也不要把 Key 分享給任何人**。\n\n"
-        "本網站設計上不會把這組 Key 寫入 Supabase、使用量資料表、JSON 設定檔、GitHub 或網站的永久 Secrets；"
-        "它只供目前這個瀏覽器 Session 暫時使用。"
+        "本網站設計，只將這組 Key 提供目前這個瀏覽器暫時使用。"
     )
 
     _show_v11_key = st.checkbox(
         "👁️ 顯示 API Key（再次點擊即可隱藏）",
         value=False,
         key="v11_show_api_key",
-        help="為安全起見，預設以 •••••••• 隱碼顯示。",
     )
 
     _v11_user_api_key = st.text_input(
@@ -1220,32 +1226,20 @@ if _api_mode == "🔑 使用自己的 OpenAI API":
         type="default" if _show_v11_key else "password",
         placeholder="sk-••••••••••••••••••••",
         key="v11_user_api_key",
-        help="只在本次 Session 使用；請勿將 API Key 貼到公開聊天室或程式碼中。",
+        help="請輸入你自己的 OpenAI API Key。",
     ).strip()
 
     if _v11_user_api_key:
         st.success(
             "🔒 已取得本次 Session 的 API Key。"
-            "使用「自己的 API」時，不會扣除網站全站每日 10 次額度。"
+            "使用「自己的 API」時，不受網站每日 10 次額度限制。"
         )
     else:
-        st.warning("⚠️ 目前尚未輸入自己的 API Key；請輸入後才能使用此模式。")
-
-    st.caption(
-        "💡 安全建議：完成使用後，可關閉瀏覽器分頁／Session，並在 OpenAI 帳號的 API Keys 頁面定期檢查與撤銷不再使用的 Key。"
-    )
-
-else:
-    st.caption(
-        "🆓 目前使用網站提供的全站每日免費額度。"
-        "所有訪客共用每日 10 次；成功生成才會保留扣除，生成失敗會退款。"
-    )
+        st.warning("⚠️ 請先輸入自己的 OpenAI API Key。")
 
 v10_section("✨ ⑧ 生成 4×2 原始總圖", "#e67e22")
 
 
-# V11：只有「網站免費額度」模式需要讀取全站額度。
-_daily_quota = _show_daily_ai_quota() if _api_mode == "🆓 使用網站免費額度" else None
 
 if st.button("✨ 生成 4×2 八格總圖", type="primary", use_container_width=True):
     if not st.session_state.uploaded_image_bytes:
@@ -1577,7 +1571,7 @@ if st.session_state.generated_4x2_bytes:
             )
         except Exception as e:
             st.error(f"打包失敗：{e}")
-    st.caption("V11｜STEP 02B-3A｜自有 API Session＋隱碼保護；沿用既有定位點裁切系統。")
+    st.caption("V11｜STEP 02B-3B｜AI 生成方式介面整理＋自有 API 隱碼保護。")
 st.divider()
 st.caption("V11｜STEP 02B-3A｜自有 API Session＋隱碼保護")
 
