@@ -458,6 +458,66 @@ html[data-theme="dark"] div[data-testid="stCheckbox"] label{
     padding-right:.75rem !important;
   }
 }
+
+/* ------------------------------------------------------------
+   02C-1 FIX2｜Streamlit 內建 Light / Dark 選單最終覆蓋
+   針對 [data-theme="dark"] 可能位於 html / body / app container
+   的情況，避免「文字變白、背景仍是白色」的半反色狀態。
+   ------------------------------------------------------------ */
+
+/* DARK：只要頁面樹上存在 data-theme="dark"，就啟用 */
+[data-theme="dark"] [data-testid="stAppViewContainer"],
+[data-theme="dark"] [data-testid="stAppViewContainer"] > .main,
+[data-theme="dark"] [data-testid="stHeader"],
+[data-theme="dark"] [data-testid="stMain"]{
+  background-color:#17191d !important;
+}
+
+[data-theme="dark"] [data-testid="stAppViewContainer"] .main .block-container{
+  background-color:transparent !important;
+}
+
+[data-theme="dark"] [data-testid="stAppViewContainer"] p,
+[data-theme="dark"] [data-testid="stAppViewContainer"] label,
+[data-theme="dark"] [data-testid="stAppViewContainer"] span,
+[data-theme="dark"] [data-testid="stAppViewContainer"] small,
+[data-theme="dark"] [data-testid="stAppViewContainer"] .stCaption{
+  color:#f0f0f0 !important;
+}
+
+/* Dark cards / expanders / upload areas */
+[data-theme="dark"] div[data-testid="stExpander"],
+[data-theme="dark"] div[data-testid="stFileUploader"] section,
+[data-theme="dark"] div[data-testid="stVerticalBlockBorderWrapper"]{
+  background-color:#1c1f24 !important;
+  border-color:#3a3f47 !important;
+}
+
+/* Dark inputs */
+[data-theme="dark"] div[data-testid="stTextInput"] input,
+[data-theme="dark"] div[data-testid="stTextArea"] textarea,
+[data-theme="dark"] div[data-testid="stNumberInput"] input,
+[data-theme="dark"] div[data-testid="stSelectbox"] [data-baseweb="select"] > div,
+[data-theme="dark"] div[data-testid="stMultiSelect"] [data-baseweb="select"] > div{
+  background-color:#202329 !important;
+  color:#f0f0f0 !important;
+  border-color:#3a3f47 !important;
+}
+
+/* Dark uploader text */
+[data-theme="dark"] div[data-testid="stFileUploader"] *,
+[data-theme="dark"] div[data-testid="stExpander"] *,
+[data-theme="dark"] div[data-testid="stVerticalBlockBorderWrapper"] *{
+  color:#f0f0f0 !important;
+}
+
+/* Avoid forcing primary buttons to the neutral dark style */
+[data-theme="dark"] div[data-testid="stButton"] > button:not([kind="primary"]){
+  background-color:#202329 !important;
+  color:#f0f0f0 !important;
+  border-color:#3a3f47 !important;
+}
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -1793,7 +1853,7 @@ if st.session_state.generated_4x2_bytes:
             )
         except Exception as e:
             st.error(f"打包失敗：{e}")
-    st.caption("V11｜STEP 02C-1 FIX1｜白天／深色模式亮度修正＋自有 API 隱碼保護。")
+    st.caption("V11｜STEP 02C-1 FIX2｜白天／深色模式亮度修正＋自有 API 隱碼保護。")
 st.divider()
 st.caption("V11｜STEP 02C-1｜自有 API Session＋隱碼保護")
 
