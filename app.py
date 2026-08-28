@@ -854,6 +854,91 @@ def _v12_new_project_metadata():
 st.session_state.setdefault("v12_current_project", _v12_new_project_metadata())
 st.session_state.setdefault("v12_projects_local_index", [])
 
+# ============================================================
+# V12｜STEP 01A③｜作品暫存與歷史紀錄
+# 本階段採用「目前瀏覽器 Session 暫存」：
+# - 不寫入 AI 每日額度資料
+# - 不保存 API Key
+# - 可在本次瀏覽期間查看、重新下載、載回作品
+# - 後續可再擴充為真正的瀏覽器永久保存 / 雲端保存
+# ============================================================
+V12_HISTORY_LIMIT = 12
+
+def _v12_png_bytes(image):
+    buf = BytesIO()
+    image.convert("RGBA").save(buf, "PNG", optimize=True)
+    return buf.getvalue()
+
+def _v12_history_record(metadata, zip_bytes, grid_bytes=None,
+                        main_bytes=None, tab_bytes=None,
+                        sticker_bytes=None, main_no=None, tab_no=None):
+    metadata = dict(metadata or {})
+    project_id = str(metadata.get("project_id") or uuid4())
+    now = _v12_now_iso()
+
+    record = {
+        "project_id": project_id,
+        "project_name": (
+            _v12_normalize_project_name(metadata.get("project_name"))
+            or _v12_default_project_name()
+        ),
+        "created_at": metadata.get("created_at") or now,
+        "updated_at": now,
+        "style_name": str(metadata.get("style_name") or ""),
+        "font_name": str(metadata.get("font_name") or ""),
+        "text_style": str(metadata.get("text_style") or ""),
+        "generation_method": str(metadata.get("generation_method") or ""),
+        "transparent_background": bool(metadata.get("transparent_background", False)),
+        "sticker_texts": list(metadata.get("sticker_texts") or [""] * 8)[:8],
+        "main_no": str(main_no or ""),
+        "tab_no": str(tab_no or ""),
+        "zip_bytes": bytes(zip_bytes or b""),
+        "grid_bytes": bytes(grid_bytes or b""),
+        "main_bytes": bytes(main_bytes or b""),
+        "tab_bytes": bytes(tab_bytes or b""),
+        "sticker_bytes": dict(sticker_bytes or {}),
+    }
+
+    projects = list(st.session_state.get("v12_projects_local_index", []))
+    projects = [p for p in projects if str(p.get("project_id")) != project_id]
+    projects.insert(0, record)
+    st.session_state["v12_projects_local_index"] = projects[:V12_HISTORY_LIMIT]
+
+    project = _v12_current_project()
+    project.update({
+        "project_id": project_id,
+        "project_name": record["project_name"],
+        "updated_at": now,
+    })
+    st.session_state["v12_current_project"] = project
+    return record
+
+def _v12_load_history_record(record):
+    metadata = _v12_new_project_metadata()
+    for key in (
+        "project_id", "project_name", "created_at", "updated_at",
+        "style_name", "font_name", "text_style", "generation_method",
+        "transparent_background", "sticker_texts"
+    ):
+        if key in record:
+            metadata[key] = record[key]
+
+    st.session_state["v12_current_project"] = metadata
+    st.session_state["v12_project_name_input"] = metadata.get("project_name", "")
+    st.session_state["generated_4x2_bytes"] = record.get("grid_bytes") or None
+    st.session_state["v12_loaded_history_main_no"] = record.get("main_no", "")
+    st.session_state["v12_loaded_history_tab_no"] = record.get("tab_no", "")
+
+    texts = list(metadata.get("sticker_texts") or [""] * 8)
+    for i in range(8):
+        st.session_state[f"sticker_text_{i}"] = str(texts[i] if i < len(texts) else "")
+
+def _v12_delete_history_record(project_id):
+    projects = list(st.session_state.get("v12_projects_local_index", []))
+    st.session_state["v12_projects_local_index"] = [
+        p for p in projects if str(p.get("project_id")) != str(project_id)
+    ]
+
 def _v12_current_project():
     project = st.session_state.get("v12_current_project")
     if not isinstance(project, dict):
@@ -1026,33 +1111,101 @@ st.session_state.setdefault("v12_view", "create")
 
 if st.session_state["v12_view"] == "library":
     st.markdown('<div class="v10-main-title">📚 我的作品</div>', unsafe_allow_html=True)
-    st.caption("這裡將顯示目前瀏覽器中保存的作品。作品不會寫入網站的每日 AI 額度資料。")
+    st.caption("本次瀏覽期間完成打包的作品會暫存在這裡。你可以查看設定、重新下載 ZIP，或載回創作頁繼續使用。")
 
-    _search_name = st.text_input(
-        "🔎 搜尋作品名稱",
-        placeholder="輸入作品名稱搜尋…",
-        key="v12_project_search",
-    )
+    _projects_all = list(st.session_state.get("v12_projects_local_index", []))
+    _top_a, _top_b = st.columns([4, 1])
+    with _top_a:
+        _search_name = st.text_input(
+            "🔎 搜尋作品名稱",
+            placeholder="輸入作品名稱搜尋…",
+            key="v12_project_search",
+        )
+    with _top_b:
+        st.metric("暫存作品", len(_projects_all))
 
-    _projects = list(st.session_state.get("v12_projects_local_index", []))
+    _projects = list(_projects_all)
     if _search_name.strip():
         needle = _search_name.strip().lower()
-        _projects = [
-            p for p in _projects
-            if needle in str(p.get("project_name", "")).lower()
-        ]
+        _projects = [p for p in _projects if needle in str(p.get("project_name", "")).lower()]
 
     if not _projects:
         st.info("📭 目前還沒有保存的作品")
-        st.markdown(
-            """
-            完成一組貼圖後，它會出現在這裡。  
-            目前已加入作品名稱與 Project Metadata 同步；下一步會加入瀏覽器本機暫存、作品縮圖與作品詳情。
-            """
-        )
+        st.caption("完成「裁切＋製作貼圖檔案＋一鍵打包」後，作品會自動出現在這裡。")
+    else:
+        for _idx, _project in enumerate(_projects):
+            _pid = str(_project.get("project_id", _idx))
+            _name = str(_project.get("project_name") or _v12_default_project_name())
 
-    st.divider()
-    st.caption("V12｜STEP 01A①：目前只建立作品庫導航與 Project 資料骨架，尚未啟用永久保存。")
+            _card_left, _card_right = st.columns([1, 2.4], vertical_alignment="top")
+
+            with _card_left:
+                if _project.get("main_bytes"):
+                    st.image(_project["main_bytes"], caption=f"⭐ MAIN {_project.get('main_no') or '—'}", use_container_width=True)
+                elif _project.get("grid_bytes"):
+                    st.image(_project["grid_bytes"], caption="4×2 原始總圖", use_container_width=True)
+                else:
+                    st.info("🖼️ 尚無預覽圖")
+
+            with _card_right:
+                st.markdown(f"### 🏷️ {_name}")
+
+                _meta_parts = []
+                if _project.get("style_name"):
+                    _meta_parts.append(f"🎨 {_project['style_name']}")
+                if _project.get("font_name"):
+                    _meta_parts.append(f"🔤 {_project['font_name']}")
+                if _project.get("transparent_background"):
+                    _meta_parts.append("🖼️ 透明背景 PNG")
+                if _project.get("main_no"):
+                    _meta_parts.append(f"⭐ MAIN={_project['main_no']}")
+                if _project.get("tab_no"):
+                    _meta_parts.append(f"🏷️ TAB={_project['tab_no']}")
+                if _meta_parts:
+                    st.caption("　｜　".join(_meta_parts))
+
+                st.caption(f"最後打包：{_project.get('updated_at', '')}")
+
+                _act1, _act2, _act3 = st.columns(3)
+                with _act1:
+                    if _project.get("zip_bytes"):
+                        st.download_button(
+                            "⬇️ 重新下載 ZIP",
+                            data=_project["zip_bytes"],
+                            file_name=f"{_v12_safe_download_stem(_name)}.zip",
+                            mime="application/zip",
+                            use_container_width=True,
+                            key=f"v12_redownload_{_pid}",
+                        )
+                with _act2:
+                    if st.button("↩️ 載回創作頁", key=f"v12_load_{_pid}", use_container_width=True):
+                        _v12_load_history_record(_project)
+                        st.session_state["v12_view"] = "create"
+                        st.rerun()
+                with _act3:
+                    if st.button("🗑️ 刪除", key=f"v12_delete_{_pid}", use_container_width=True):
+                        _v12_delete_history_record(_pid)
+                        st.rerun()
+
+                with st.expander("🔍 查看這組作品詳細設定", expanded=False):
+                    st.write(f"**作品名稱：** {_name}")
+                    st.write(f"**生成方式：** {_project.get('generation_method') or '未記錄'}")
+                    st.write(f"**文字風格：** {_project.get('text_style') or '未記錄'}")
+                    st.write(f"**建立時間：** {_project.get('created_at') or '未記錄'}")
+
+                    _texts = list(_project.get("sticker_texts") or [])
+                    if any(str(x).strip() for x in _texts):
+                        st.markdown("**8 張貼圖文字：**")
+                        for _n, _txt in enumerate(_texts, start=1):
+                            st.write(f"{_n:02d}. {_txt or '（未設定）'}")
+
+                    if _project.get("grid_bytes"):
+                        st.markdown("**4×2 原始總圖：**")
+                        st.image(_project["grid_bytes"], use_container_width=True)
+
+            st.divider()
+
+    st.caption(f"V12｜STEP 01A③｜目前最多暫存 {V12_HISTORY_LIMIT} 組作品，不保存 API Key，也不寫入網站每日 AI 額度資料。")
     st.stop()
 
 
@@ -1943,9 +2096,17 @@ if st.session_state.generated_4x2_bytes:
     _main_tab_cols = st.columns(4)
     _main_tab_options = [f"{i:02d}" for i in range(1,9)]
 
-    if "step11b1_main" not in st.session_state:
+    _v12_loaded_main = str(st.session_state.pop("v12_loaded_history_main_no", "") or "")
+    _v12_loaded_tab = str(st.session_state.pop("v12_loaded_history_tab_no", "") or "")
+
+    if _v12_loaded_main in _main_tab_options:
+        st.session_state["step11b1_main"] = _v12_loaded_main
+    elif "step11b1_main" not in st.session_state:
         st.session_state.step11b1_main = "01"
-    if "step11b1_tab" not in st.session_state:
+
+    if _v12_loaded_tab in _main_tab_options:
+        st.session_state["step11b1_tab"] = _v12_loaded_tab
+    elif "step11b1_tab" not in st.session_state:
         st.session_state.step11b1_tab = "02"
 
     with _main_tab_cols[0]:
@@ -2058,9 +2219,31 @@ if st.session_state.generated_4x2_bytes:
                 _zip.writestr("tab.png",_tb.getvalue())
 
             _zipbuf.seek(0)
+
+            # V12｜STEP 01A③：打包成功後自動加入「我的作品」暫存。
+            _history_stickers = {}
+            for _no, _im in cropped_images.items():
+                _history_stickers[f"{_no:02d}"] = _v12_png_bytes(_im)
+
+            _history_project = _v12_project_snapshot()
+            _history_project["project_name"] = (
+                _history_project.get("project_name") or _v12_default_project_name()
+            )
+
+            _v12_history_record(
+                metadata=_history_project,
+                zip_bytes=_zipbuf.getvalue(),
+                grid_bytes=st.session_state.get("generated_4x2_bytes"),
+                main_bytes=_mb.getvalue(),
+                tab_bytes=_tb.getvalue(),
+                sticker_bytes=_history_stickers,
+                main_no=main_no,
+                tab_no=tab_no,
+            )
+
             st.success(
                 f"🎉 完成！MAIN={main_no}、TAB={tab_no}，"
-                "已將 01～08＋main.png＋tab.png 打包。"
+                "已將 01～08＋main.png＋tab.png 打包，並加入「我的作品」。"
             )
             st.download_button(
                 "⬇️ 下載完整 LINE 套件 ZIP",
