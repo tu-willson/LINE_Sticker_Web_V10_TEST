@@ -165,12 +165,12 @@ def _public02a_sync_style_bank_from_widgets():
 
     _public02a_set_style_bank(bank)
 
-    # Keep legacy/combined store in sync for export and other old code.
-    combined = _public02a_get_preset_store()
-    for i in range(1, 11):
-        combined["style_custom_names"][i - 1] = bank[str(i)]["name"]
-        combined["style_custom"][i - 1] = bank[str(i)]["prompt"]
-    _public02a_set_preset_store(combined)
+    # IMPORTANT FIX11A:
+    # This function is called during _public02a_init(), before the legacy
+    # combined preset-store helper functions are defined later in the file.
+    # Therefore it must only synchronize the dedicated Style Bank here.
+    # The combined legacy store is synchronized later by _save_v10_presets()
+    # and by the normal creation-page flow, after all helpers are defined.
     return bank
 
 
