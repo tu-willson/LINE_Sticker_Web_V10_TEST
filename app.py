@@ -240,102 +240,218 @@ st.set_page_config(
 # - 主要內容維持中央操作區
 # ============================================================
 # ============================================================
-# V11｜STEP 02C-1｜白天模式亮度優化
-# 只調整網頁視覺顯示：降低純白刺眼感、避免系統明暗模式造成
-# Streamlit 原生元件的反色；不修改 AI / API / Supabase / quota 邏輯。
+# V11｜STEP 02C-1｜白天／深色模式亮度修正 FIX1
+# 只調整顯示層：白天降低刺眼程度，深色模式恢復正常覆蓋。
+# 不修改 AI / API / Supabase / quota / Session / 生成邏輯。
 # ============================================================
 st.markdown("""
 <style>
-/* ---- 02C-1：柔和白天模式基底 ---- */
+/* ------------------------------------------------------------
+   02C-1 FIX1
+   重點：
+   1. 不再強制 color-scheme: light
+   2. 不用全域 div { color: ... }，避免把 Streamlit 深色模式蓋掉
+   3. 白天只把純白降低成柔和暖灰白
+   4. 深色模式使用獨立變數，讓 Streamlit / 系統 dark mode 可以正常覆蓋
+   ------------------------------------------------------------ */
+
 :root{
-  color-scheme: light;
-  --v11-day-bg:#f4f2ef;
-  --v11-day-surface:#faf8f5;
-  --v11-day-surface-2:#f7f4f1;
-  --v11-day-border:#e4ddd6;
-  --v11-day-text:#3f3a36;
-  --v11-day-muted:#716a64;
+  --v11-bg:#ece9e5;
+  --v11-surface:#f5f2ee;
+  --v11-surface-2:#f0ede9;
+  --v11-border:#d9d1c9;
+  --v11-text:#3f3934;
+  --v11-muted:#6f6862;
 }
 
-/* Streamlit 主頁面：從刺眼純白降低一級亮度 */
-html, body,
-[data-testid="stAppViewContainer"],
-[data-testid="stAppViewContainer"] > .main,
-[data-testid="stHeader"]{
-  background-color:var(--v11-day-bg) !important;
+/* 白天模式：只降低亮度，不更換既有主色 */
+html:not([data-theme="dark"]) body,
+html:not([data-theme="dark"]) [data-testid="stAppViewContainer"],
+html:not([data-theme="dark"]) [data-testid="stAppViewContainer"] > .main,
+html:not([data-theme="dark"]) [data-testid="stHeader"]{
+  background-color:var(--v11-bg) !important;
 }
 
-[data-testid="stAppViewContainer"] .main .block-container{
+html:not([data-theme="dark"]) [data-testid="stAppViewContainer"] .main .block-container{
   background:transparent !important;
 }
 
-/* 頂部 header 保持乾淨，不讓系統 theme 反色 */
-[data-testid="stHeader"]{
-  background:var(--v11-day-bg) !important;
+/* 白天文字：只指定真正的文字元素，避免把所有 div 一起鎖死 */
+html:not([data-theme="dark"]) [data-testid="stAppViewContainer"] p,
+html:not([data-theme="dark"]) [data-testid="stAppViewContainer"] label,
+html:not([data-theme="dark"]) [data-testid="stAppViewContainer"] .stCaption,
+html:not([data-theme="dark"]) [data-testid="stAppViewContainer"] small{
+  color:var(--v11-text) !important;
 }
 
-/* 一般文字固定為柔和深色，避免白底時文字被反轉 */
-[data-testid="stAppViewContainer"],
-[data-testid="stAppViewContainer"] p,
-[data-testid="stAppViewContainer"] label,
-[data-testid="stAppViewContainer"] span,
-[data-testid="stAppViewContainer"] div{
-  color:var(--v11-day-text);
+html:not([data-theme="dark"]) [data-testid="stAppViewContainer"] .stCaption,
+html:not([data-theme="dark"]) [data-testid="stAppViewContainer"] small{
+  color:var(--v11-muted) !important;
 }
 
-[data-testid="stAppViewContainer"] .stCaption,
-[data-testid="stAppViewContainer"] small{
-  color:var(--v11-day-muted) !important;
+/* 白天輸入區 */
+html:not([data-theme="dark"]) div[data-testid="stTextInput"] input,
+html:not([data-theme="dark"]) div[data-testid="stTextArea"] textarea,
+html:not([data-theme="dark"]) div[data-testid="stNumberInput"] input,
+html:not([data-theme="dark"]) div[data-testid="stSelectbox"] [data-baseweb="select"] > div,
+html:not([data-theme="dark"]) div[data-testid="stMultiSelect"] [data-baseweb="select"] > div{
+  background:var(--v11-surface) !important;
+  color:var(--v11-text) !important;
+  border-color:var(--v11-border) !important;
 }
 
-/* 輸入區：比背景略亮，但不回到刺眼純白 */
-div[data-testid="stTextInput"] input,
-div[data-testid="stTextArea"] textarea,
-div[data-testid="stNumberInput"] input,
-div[data-testid="stSelectbox"] [data-baseweb="select"] > div,
-div[data-testid="stMultiSelect"] [data-baseweb="select"] > div{
-  background:var(--v11-day-surface) !important;
-  color:var(--v11-day-text) !important;
-  border-color:var(--v11-day-border) !important;
+/* 白天上傳區 */
+html:not([data-theme="dark"]) div[data-testid="stFileUploader"] section{
+  background:var(--v11-surface-2) !important;
+  border-color:var(--v11-border) !important;
 }
 
-/* 檔案上傳區 */
-div[data-testid="stFileUploader"] section{
-  background:var(--v11-day-surface-2) !important;
-  border-color:var(--v11-day-border) !important;
-}
-
-/* Expander / 一般容器：只做很淡的層次，不更換原本主色 */
-div[data-testid="stExpander"]{
-  background:rgba(250,248,245,.82) !important;
-  border-color:var(--v11-day-border) !important;
+/* 白天 Expander */
+html:not([data-theme="dark"]) div[data-testid="stExpander"]{
+  background:var(--v11-surface) !important;
+  border-color:var(--v11-border) !important;
   border-radius:12px !important;
 }
 
-/* 讓 Streamlit 原生按鈕文字在白天模式維持可讀性。
-   不覆蓋既有 type=primary 的主色。 */
-div[data-testid="stButton"] > button:not([kind="primary"]){
-  background:var(--v11-day-surface) !important;
-  color:var(--v11-day-text) !important;
-  border-color:var(--v11-day-border) !important;
+/* 白天一般按鈕：不覆蓋 primary 主色 */
+html:not([data-theme="dark"]) div[data-testid="stButton"] > button:not([kind="primary"]){
+  background:var(--v11-surface) !important;
+  color:var(--v11-text) !important;
+  border-color:var(--v11-border) !important;
 }
 
-div[data-testid="stButton"] > button:not([kind="primary"]):hover{
-  background:#f0ece8 !important;
+html:not([data-theme="dark"]) div[data-testid="stButton"] > button:not([kind="primary"]):hover{
+  background:#e7e2dd !important;
 }
 
-/* Radio / Checkbox 的文字不跟著系統 theme 反色 */
-div[data-testid="stRadio"] label,
-div[data-testid="stCheckbox"] label{
-  color:var(--v11-day-text) !important;
+/* Radio / Checkbox */
+html:not([data-theme="dark"]) div[data-testid="stRadio"] label,
+html:not([data-theme="dark"]) div[data-testid="stCheckbox"] label{
+  color:var(--v11-text) !important;
 }
 
-/* 連結按鈕保留原有紅色識別，不做反色 */
-div[data-testid="stLinkButton"] > a{
-  color:#ffffff !important;
+/* ------------------------------------------------------------
+   深色模式
+   不再被原本的「強制 light」CSS 蓋掉。
+   同時保留原有功能色與按鈕色。
+   ------------------------------------------------------------ */
+@media (prefers-color-scheme: dark){
+  :root{
+    --v11-bg:#17191d;
+    --v11-surface:#202329;
+    --v11-surface-2:#1c1f24;
+    --v11-border:#3a3f47;
+    --v11-text:#f0f0f0;
+    --v11-muted:#b5b8bd;
+  }
+
+  body,
+  [data-testid="stAppViewContainer"],
+  [data-testid="stAppViewContainer"] > .main,
+  [data-testid="stHeader"]{
+    background-color:var(--v11-bg) !important;
+  }
+
+  [data-testid="stAppViewContainer"] .main .block-container{
+    background:transparent !important;
+  }
+
+  [data-testid="stAppViewContainer"] p,
+  [data-testid="stAppViewContainer"] label,
+  [data-testid="stAppViewContainer"] .stCaption,
+  [data-testid="stAppViewContainer"] small{
+    color:var(--v11-text) !important;
+  }
+
+  [data-testid="stAppViewContainer"] .stCaption,
+  [data-testid="stAppViewContainer"] small{
+    color:var(--v11-muted) !important;
+  }
+
+  div[data-testid="stTextInput"] input,
+  div[data-testid="stTextArea"] textarea,
+  div[data-testid="stNumberInput"] input,
+  div[data-testid="stSelectbox"] [data-baseweb="select"] > div,
+  div[data-testid="stMultiSelect"] [data-baseweb="select"] > div{
+    background:var(--v11-surface) !important;
+    color:var(--v11-text) !important;
+    border-color:var(--v11-border) !important;
+  }
+
+  div[data-testid="stFileUploader"] section{
+    background:var(--v11-surface-2) !important;
+    border-color:var(--v11-border) !important;
+  }
+
+  div[data-testid="stExpander"]{
+    background:var(--v11-surface) !important;
+    border-color:var(--v11-border) !important;
+  }
+
+  div[data-testid="stButton"] > button:not([kind="primary"]){
+    background:var(--v11-surface) !important;
+    color:var(--v11-text) !important;
+    border-color:var(--v11-border) !important;
+  }
+
+  div[data-testid="stRadio"] label,
+  div[data-testid="stCheckbox"] label{
+    color:var(--v11-text) !important;
+  }
 }
 
-/* 手機：再降低左右留白，讓柔和背景不顯得厚重 */
+/* Streamlit 若以 data-theme="dark" 標示深色模式，再額外提高優先度 */
+html[data-theme="dark"] body,
+html[data-theme="dark"] [data-testid="stAppViewContainer"],
+html[data-theme="dark"] [data-testid="stAppViewContainer"] > .main,
+html[data-theme="dark"] [data-testid="stHeader"]{
+  background-color:#17191d !important;
+}
+
+html[data-theme="dark"] [data-testid="stAppViewContainer"] .main .block-container{
+  background:transparent !important;
+}
+
+html[data-theme="dark"] [data-testid="stAppViewContainer"] p,
+html[data-theme="dark"] [data-testid="stAppViewContainer"] label,
+html[data-theme="dark"] [data-testid="stAppViewContainer"] .stCaption,
+html[data-theme="dark"] [data-testid="stAppViewContainer"] small{
+  color:#f0f0f0 !important;
+}
+
+html[data-theme="dark"] [data-testid="stAppViewContainer"] .stCaption,
+html[data-theme="dark"] [data-testid="stAppViewContainer"] small{
+  color:#b5b8bd !important;
+}
+
+html[data-theme="dark"] div[data-testid="stTextInput"] input,
+html[data-theme="dark"] div[data-testid="stTextArea"] textarea,
+html[data-theme="dark"] div[data-testid="stNumberInput"] input,
+html[data-theme="dark"] div[data-testid="stSelectbox"] [data-baseweb="select"] > div,
+html[data-theme="dark"] div[data-testid="stMultiSelect"] [data-baseweb="select"] > div{
+  background:#202329 !important;
+  color:#f0f0f0 !important;
+  border-color:#3a3f47 !important;
+}
+
+html[data-theme="dark"] div[data-testid="stFileUploader"] section,
+html[data-theme="dark"] div[data-testid="stExpander"]{
+  background:#1c1f24 !important;
+  border-color:#3a3f47 !important;
+}
+
+html[data-theme="dark"] div[data-testid="stButton"] > button:not([kind="primary"]){
+  background:#202329 !important;
+  color:#f0f0f0 !important;
+  border-color:#3a3f47 !important;
+}
+
+html[data-theme="dark"] div[data-testid="stRadio"] label,
+html[data-theme="dark"] div[data-testid="stCheckbox"] label{
+  color:#f0f0f0 !important;
+}
+
+/* 手機 */
 @media (max-width:800px){
   [data-testid="stAppViewContainer"] .main .block-container{
     padding-left:.75rem !important;
@@ -1677,7 +1793,7 @@ if st.session_state.generated_4x2_bytes:
             )
         except Exception as e:
             st.error(f"打包失敗：{e}")
-    st.caption("V11｜STEP 02C-1｜白天模式亮度優化＋自有 API 隱碼保護。")
+    st.caption("V11｜STEP 02C-1 FIX1｜白天／深色模式亮度修正＋自有 API 隱碼保護。")
 st.divider()
 st.caption("V11｜STEP 02C-1｜自有 API Session＋隱碼保護")
 
