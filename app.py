@@ -179,6 +179,44 @@ def _load_v10_presets():
     }
 
 
+def _v12_snapshot_custom_style_widgets():
+    """在離開「開始製作」頁前，備份自定義風格到非 widget Session key。
+    Streamlit 在某個 widget 暫時不被渲染時，可能清除該 widget key；
+    因此不能只依賴 v10_style_* widget key。
+    """
+    snapshot = {
+        "style_custom": [
+            str(st.session_state.get(f"v10_style_custom_{i}", ""))
+            for i in range(1, 11)
+        ],
+        "style_custom_names": [
+            str(st.session_state.get(f"v10_style_name_{i}", f"使用者自定{i}"))
+            for i in range(1, 11)
+        ],
+    }
+    st.session_state["v12_custom_style_backup"] = snapshot
+
+def _v12_restore_custom_style_widgets():
+    """回到「開始製作」頁時，將備份還原到 widget key。"""
+    snapshot = st.session_state.get("v12_custom_style_backup")
+    if not isinstance(snapshot, dict):
+        return
+
+    names = list(snapshot.get("style_custom_names") or [])
+    styles = list(snapshot.get("style_custom") or [])
+
+    for i in range(1, 11):
+        if i - 1 < len(names):
+            st.session_state.setdefault(
+                f"v10_style_name_{i}",
+                str(names[i - 1]),
+            )
+        if i - 1 < len(styles):
+            st.session_state.setdefault(
+                f"v10_style_custom_{i}",
+                str(styles[i - 1]),
+            )
+
 def _save_v10_presets():
     # 公開版：widget 本身已經把目前輸入值保存在 Session State。
     # 這裡只讀取並驗證，不再重新寫入 widget 的 Session State key。
@@ -203,6 +241,10 @@ def _save_v10_presets():
             ],
         }
         st.session_state["public02a_last_preset_snapshot"] = _snapshot
+        st.session_state["v12_custom_style_backup"] = {
+            "style_custom": list(_snapshot["style_custom"]),
+            "style_custom_names": list(_snapshot["style_custom_names"]),
+        }
         return True
     except Exception:
         return False
@@ -1124,6 +1166,8 @@ with _v12_nav_cols[0]:
         st.rerun()
 with _v12_nav_cols[1]:
     if st.button("📚 我的作品", key="v12_nav_library", use_container_width=True):
+        # 離開創作頁前，先備份目前自定義風格。
+        _v12_snapshot_custom_style_widgets()
         st.session_state["v12_view"] = "library"
         st.rerun()
 
@@ -1228,6 +1272,9 @@ if st.session_state["v12_view"] == "library":
     st.caption(f"V12｜STEP 01A③｜目前最多暫存 {V12_HISTORY_LIMIT} 組作品，不保存 API Key，也不寫入網站每日 AI 額度資料。")
     st.stop()
 
+
+# V12｜01A③ FIX2：從「我的作品」返回時先恢復自定義風格。
+_v12_restore_custom_style_widgets()
 
 st.markdown('<div class="v10-main-title">🎨 LINE 貼圖創作工作室</div>', unsafe_allow_html=True)
 st.caption("V11｜公開版｜快速完成 LINE 貼圖創作")
