@@ -209,9 +209,25 @@ def _load_v10_presets():
 
 def _save_v10_presets():
     try:
+        existing = _public02a_get_preset_store()
         snapshot = {
-            "style_custom": [str(st.session_state.get(f"v10_style_custom_{i}", "")) for i in range(1, 11)],
-            "style_custom_names": [str(st.session_state.get(f"v10_style_name_{i}", f"使用者自定{i}")) for i in range(1, 11)],
+            # 有 render 的編輯器以目前值為準；key 不存在時保留 durable store。
+            "style_custom": [
+                str(
+                    st.session_state[f"v10_style_custom_{i}"]
+                    if f"v10_style_custom_{i}" in st.session_state
+                    else existing["style_custom"][i - 1]
+                )
+                for i in range(1, 11)
+            ],
+            "style_custom_names": [
+                str(
+                    st.session_state[f"v10_style_name_{i}"]
+                    if f"v10_style_name_{i}" in st.session_state
+                    else existing["style_custom_names"][i - 1]
+                )
+                for i in range(1, 11)
+            ],
             "character_custom": [str(st.session_state.get(f"v10_character_custom_{i}", "")) for i in range(1, 4)],
             "character_enabled": [bool(st.session_state.get(f"v10_character_enabled_{i}", False)) for i in range(1, 4)],
         }
@@ -1308,10 +1324,20 @@ if style_mode=="⭐ 自定義風格":
     style="↓ 請選擇風格"
     st.success("✨ 已切換到「自定義風格」模式")
 
+    # V12 FIX6｜關鍵修正：
+    # 「已儲存風格」不能再從條件式 widget key 當資料來源。
+    # 因為切回一般風格時，v10_style_* widget 不會被渲染，
+    # Streamlit 會在 rerun 後清除這些 widget key。
+    #
+    # 因此作品真正的已儲存風格一律從非 Widget store 讀取。
+    _preset_store = _public02a_get_preset_store()
+    _preset_names = list(_preset_store["style_custom_names"])
+    _preset_styles = list(_preset_store["style_custom"])
+
     _custom_style_slots=[]
     for _i in range(1,11):
-        _sv=st.session_state.get(f"v10_style_custom_{_i}","").strip()
-        _sn=st.session_state.get(f"v10_style_name_{_i}",f"使用者自定{_i}").strip() or f"使用者自定{_i}"
+        _sv=str(_preset_styles[_i-1]).strip()
+        _sn=str(_preset_names[_i-1]).strip() or f"使用者自定{_i}"
         if _sv:
             _custom_style_slots.append((_i,_sn,_sv))
 
@@ -1330,6 +1356,18 @@ if style_mode=="⭐ 自定義風格":
         custom_style=""
 
     with st.expander("💾 編輯／儲存自定義風格 1～10",expanded=False):
+        # 編輯器 Widget 僅是畫面；真正資料仍以 _preset_store 為準。
+        # 若跨頁後 widget key 已被 Streamlit 清除，這裡在建立 widget 前補回。
+        for _i in range(1,11):
+            st.session_state.setdefault(
+                f"v10_style_name_{_i}",
+                str(_preset_names[_i-1]) or f"使用者自定{_i}",
+            )
+            st.session_state.setdefault(
+                f"v10_style_custom_{_i}",
+                str(_preset_styles[_i-1]),
+            )
+
         for _i in range(1,11):
             _a,_b=st.columns([1,4])
             with _a:
