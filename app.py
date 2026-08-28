@@ -139,23 +139,31 @@ def _public02a_init():
             st.session_state[f"v10_character_enabled_{i}"] = pending["character_enabled"][i - 1]
         st.session_state["public02a_custom_phrases"] = list(pending["custom_phrases"])
 
-    if not st.session_state.get("public02a_initialized", False):
-        for i in range(1, 11):
-            st.session_state.setdefault(
-                f"v10_style_custom_{i}", defaults["style_custom"][i - 1]
-            )
-            st.session_state.setdefault(
-                f"v10_style_name_{i}", defaults["style_custom_names"][i - 1]
-            )
-        for i in range(1, 4):
-            st.session_state.setdefault(
-                f"v10_character_custom_{i}", defaults["character_custom"][i - 1]
-            )
-            st.session_state.setdefault(
-                f"v10_character_enabled_{i}", defaults["character_enabled"][i - 1]
-            )
-        st.session_state.setdefault("public02a_custom_phrases", [])
-        st.session_state["public02a_initialized"] = True
+    # V12 FIX5｜關鍵修正：
+    # Streamlit 切到「我的作品」後，創作頁的 widget key 可能被移除，
+    # 但 public02a_initialized 仍然是 True。
+    # FIX4 之前因此不會再次執行 setdefault，造成回到創作頁時風格變空白。
+    #
+    # 所以每一次 rerun 都檢查「缺少的 widget key」，並從非 Widget store
+    # 重新補回；已有的 key 絕不覆蓋使用者正在編輯的內容。
+    for i in range(1, 11):
+        st.session_state.setdefault(
+            f"v10_style_custom_{i}", defaults["style_custom"][i - 1]
+        )
+        st.session_state.setdefault(
+            f"v10_style_name_{i}", defaults["style_custom_names"][i - 1]
+        )
+
+    for i in range(1, 4):
+        st.session_state.setdefault(
+            f"v10_character_custom_{i}", defaults["character_custom"][i - 1]
+        )
+        st.session_state.setdefault(
+            f"v10_character_enabled_{i}", defaults["character_enabled"][i - 1]
+        )
+
+    st.session_state.setdefault("public02a_custom_phrases", [])
+    st.session_state["public02a_initialized"] = True
 
 
 
