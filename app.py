@@ -1,4 +1,4 @@
-# V11｜STEP 02C-3A｜等待進度提示＋180 秒逾時保護
+# V11｜STEP 02C-3B｜等待進度提示＋180 秒逾時保護
 import re
 import zipfile
 import streamlit as st
@@ -301,8 +301,22 @@ st.markdown("""
   text-align:center !important;
 }
 .v10-transparent-box label{
-  font-size:1.25rem !important;
-  font-weight:800 !important;
+  font-size:2.5rem !important;
+  font-weight:900 !important;
+  line-height:1.25 !important;
+  cursor:pointer !important;
+}
+.v10-transparent-box label p,
+.v10-transparent-box label span{
+  font-size:2.5rem !important;
+  font-weight:900 !important;
+}
+.v10-transparent-box div[data-testid="stCheckbox"] input{
+  width:2.25rem !important;
+  height:2.25rem !important;
+  transform:scale(1.35);
+  transform-origin:center;
+  cursor:pointer !important;
 }
 div[data-testid="stCheckbox"] label{
   font-size:1.12rem !important;
@@ -1411,40 +1425,6 @@ if st.session_state.get("v11_generation_pending", False):
             if _fresh_quota is not None:
                 st.session_state["public_last_quota"] = _fresh_quota
 
-            # ============================================================
-            # 透明背景診斷：檢查 AI 剛生成的原始 4×2 PNG
-            # ============================================================
-            alpha = img.getchannel("A")
-            amin, amax = alpha.getextrema()
-            hist = alpha.histogram()
-            transparent_px = int(hist[0])
-            total_px = int(img.width * img.height)
-            transparent_pct = transparent_px / total_px * 100 if total_px else 0
-
-            st.markdown("### 🔎 透明背景診斷")
-            d1, d2, d3 = st.columns(3)
-            d1.metric("圖片模式", img.mode)
-            d2.metric("透明像素", f"{transparent_pct:.2f}%")
-            d3.metric("Alpha 範圍", f"{amin} ～ {amax}")
-
-            if transparent_px > 0:
-                st.success(
-                    f"🟢 **原始生成圖確認含有真正透明像素**："
-                    f"{transparent_px:,} / {total_px:,} "
-                    f"({transparent_pct:.2f}%) Alpha=0。"
-                )
-            else:
-                st.error(
-                    "🔴 **原始生成圖沒有任何透明像素！** "
-                    "如果畫面看起來像棋盤格，棋盤格很可能已經被生成成圖片內容。"
-                )
-
-            if amin == 255 and amax == 255:
-                st.warning("⚠️ Alpha 全部為 255：這張原始圖實際上是完全不透明的。")
-            elif amin == 0 and amax == 255:
-                st.info("ℹ️ Alpha 同時存在 0 與 255：這是正常透明 PNG 的典型狀態。")
-            elif amin == 0:
-                st.info("ℹ️ 有 Alpha=0，但透明像素分布需要進一步判斷。")
 
     except Exception as e:
         # 只有網站免費額度模式且已成功扣額度時才退款。
@@ -1563,7 +1543,7 @@ if st.session_state.generated_4x2_bytes:
     with _main_tab_cols[2]:
         st.markdown("### 📦 完整套件")
     with _main_tab_cols[3]:
-        st.markdown("### 🔎 透明")
+        st.markdown("### 🪄 透明背景")
 
     cmain, ctab = st.columns(2)
     with cmain:
