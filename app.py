@@ -240,226 +240,10 @@ st.set_page_config(
 # - 主要內容維持中央操作區
 # ============================================================
 # ============================================================
-# V11｜STEP 02C-1｜白天／深色模式亮度修正 FIX1
-# 只調整顯示層：白天降低刺眼程度，深色模式恢復正常覆蓋。
-# 不修改 AI / API / Supabase / quota / Session / 生成邏輯。
-# ============================================================
-st.markdown("""
-<style>
-/* ------------------------------------------------------------
-   02C-1 FIX1
-   重點：
-   1. 不再強制 color-scheme: light
-   2. 不用全域 div { color: ... }，避免把 Streamlit 深色模式蓋掉
-   3. 白天只把純白降低成柔和暖灰白
-   4. 深色模式使用獨立變數，讓 Streamlit / 系統 dark mode 可以正常覆蓋
-   ------------------------------------------------------------ */
+# V11｜STEP 02C-1｜FIX4
+# 主題顏色改由 .streamlit/config.toml 的 Streamlit 原生 Light/Dark theme 控制。
+# Python 這裡不再強制覆蓋整個 App 的背景與文字顏色。
 
-:root{
-  --v11-bg:#ece9e5;
-  --v11-surface:#f5f2ee;
-  --v11-surface-2:#f0ede9;
-  --v11-border:#d9d1c9;
-  --v11-text:#3f3934;
-  --v11-muted:#6f6862;
-}
-
-/* 白天模式：只降低亮度，不更換既有主色 */
-html:not([data-theme="dark"]) body,
-html:not([data-theme="dark"]) [data-testid="stAppViewContainer"],
-html:not([data-theme="dark"]) [data-testid="stAppViewContainer"] > .main,
-html:not([data-theme="dark"]) [data-testid="stHeader"]{
-  background-color:var(--v11-bg) !important;
-}
-
-html:not([data-theme="dark"]) [data-testid="stAppViewContainer"] .main .block-container{
-  background:transparent !important;
-}
-
-/* 白天文字：只指定真正的文字元素，避免把所有 div 一起鎖死 */
-html:not([data-theme="dark"]) [data-testid="stAppViewContainer"] p,
-html:not([data-theme="dark"]) [data-testid="stAppViewContainer"] label,
-html:not([data-theme="dark"]) [data-testid="stAppViewContainer"] .stCaption,
-html:not([data-theme="dark"]) [data-testid="stAppViewContainer"] small{
-  color:var(--v11-text) !important;
-}
-
-html:not([data-theme="dark"]) [data-testid="stAppViewContainer"] .stCaption,
-html:not([data-theme="dark"]) [data-testid="stAppViewContainer"] small{
-  color:var(--v11-muted) !important;
-}
-
-/* 白天輸入區 */
-html:not([data-theme="dark"]) div[data-testid="stTextInput"] input,
-html:not([data-theme="dark"]) div[data-testid="stTextArea"] textarea,
-html:not([data-theme="dark"]) div[data-testid="stNumberInput"] input,
-html:not([data-theme="dark"]) div[data-testid="stSelectbox"] [data-baseweb="select"] > div,
-html:not([data-theme="dark"]) div[data-testid="stMultiSelect"] [data-baseweb="select"] > div{
-  background:var(--v11-surface) !important;
-  color:var(--v11-text) !important;
-  border-color:var(--v11-border) !important;
-}
-
-/* 白天上傳區 */
-html:not([data-theme="dark"]) div[data-testid="stFileUploader"] section{
-  background:var(--v11-surface-2) !important;
-  border-color:var(--v11-border) !important;
-}
-
-/* 白天 Expander */
-html:not([data-theme="dark"]) div[data-testid="stExpander"]{
-  background:var(--v11-surface) !important;
-  border-color:var(--v11-border) !important;
-  border-radius:12px !important;
-}
-
-/* 白天一般按鈕：不覆蓋 primary 主色 */
-html:not([data-theme="dark"]) div[data-testid="stButton"] > button:not([kind="primary"]){
-  background:var(--v11-surface) !important;
-  color:var(--v11-text) !important;
-  border-color:var(--v11-border) !important;
-}
-
-html:not([data-theme="dark"]) div[data-testid="stButton"] > button:not([kind="primary"]):hover{
-  background:#e7e2dd !important;
-}
-
-/* Radio / Checkbox */
-html:not([data-theme="dark"]) div[data-testid="stRadio"] label,
-html:not([data-theme="dark"]) div[data-testid="stCheckbox"] label{
-  color:var(--v11-text) !important;
-}
-
-/* ------------------------------------------------------------
-   深色模式
-   不再被原本的「強制 light」CSS 蓋掉。
-   同時保留原有功能色與按鈕色。
-   ------------------------------------------------------------ */
-@media (prefers-color-scheme: dark){
-  :root{
-    --v11-bg:#17191d;
-    --v11-surface:#202329;
-    --v11-surface-2:#1c1f24;
-    --v11-border:#3a3f47;
-    --v11-text:#f0f0f0;
-    --v11-muted:#b5b8bd;
-  }
-
-  body,
-  [data-testid="stAppViewContainer"],
-  [data-testid="stAppViewContainer"] > .main,
-  [data-testid="stHeader"]{
-    background-color:var(--v11-bg) !important;
-  }
-
-  [data-testid="stAppViewContainer"] .main .block-container{
-    background:transparent !important;
-  }
-
-  [data-testid="stAppViewContainer"] p,
-  [data-testid="stAppViewContainer"] label,
-  [data-testid="stAppViewContainer"] .stCaption,
-  [data-testid="stAppViewContainer"] small{
-    color:var(--v11-text) !important;
-  }
-
-  [data-testid="stAppViewContainer"] .stCaption,
-  [data-testid="stAppViewContainer"] small{
-    color:var(--v11-muted) !important;
-  }
-
-  div[data-testid="stTextInput"] input,
-  div[data-testid="stTextArea"] textarea,
-  div[data-testid="stNumberInput"] input,
-  div[data-testid="stSelectbox"] [data-baseweb="select"] > div,
-  div[data-testid="stMultiSelect"] [data-baseweb="select"] > div{
-    background:var(--v11-surface) !important;
-    color:var(--v11-text) !important;
-    border-color:var(--v11-border) !important;
-  }
-
-  div[data-testid="stFileUploader"] section{
-    background:var(--v11-surface-2) !important;
-    border-color:var(--v11-border) !important;
-  }
-
-  div[data-testid="stExpander"]{
-    background:var(--v11-surface) !important;
-    border-color:var(--v11-border) !important;
-  }
-
-  div[data-testid="stButton"] > button:not([kind="primary"]){
-    background:var(--v11-surface) !important;
-    color:var(--v11-text) !important;
-    border-color:var(--v11-border) !important;
-  }
-
-  div[data-testid="stRadio"] label,
-  div[data-testid="stCheckbox"] label{
-    color:var(--v11-text) !important;
-  }
-}
-
-/* Streamlit 若以 data-theme="dark" 標示深色模式，再額外提高優先度 */
-html[data-theme="dark"] body,
-html[data-theme="dark"] [data-testid="stAppViewContainer"],
-html[data-theme="dark"] [data-testid="stAppViewContainer"] > .main,
-html[data-theme="dark"] [data-testid="stHeader"]{
-  background-color:#17191d !important;
-}
-
-html[data-theme="dark"] [data-testid="stAppViewContainer"] .main .block-container{
-  background:transparent !important;
-}
-
-html[data-theme="dark"] [data-testid="stAppViewContainer"] p,
-html[data-theme="dark"] [data-testid="stAppViewContainer"] label,
-html[data-theme="dark"] [data-testid="stAppViewContainer"] .stCaption,
-html[data-theme="dark"] [data-testid="stAppViewContainer"] small{
-  color:#f0f0f0 !important;
-}
-
-html[data-theme="dark"] [data-testid="stAppViewContainer"] .stCaption,
-html[data-theme="dark"] [data-testid="stAppViewContainer"] small{
-  color:#b5b8bd !important;
-}
-
-html[data-theme="dark"] div[data-testid="stTextInput"] input,
-html[data-theme="dark"] div[data-testid="stTextArea"] textarea,
-html[data-theme="dark"] div[data-testid="stNumberInput"] input,
-html[data-theme="dark"] div[data-testid="stSelectbox"] [data-baseweb="select"] > div,
-html[data-theme="dark"] div[data-testid="stMultiSelect"] [data-baseweb="select"] > div{
-  background:#202329 !important;
-  color:#f0f0f0 !important;
-  border-color:#3a3f47 !important;
-}
-
-html[data-theme="dark"] div[data-testid="stFileUploader"] section,
-html[data-theme="dark"] div[data-testid="stExpander"]{
-  background:#1c1f24 !important;
-  border-color:#3a3f47 !important;
-}
-
-html[data-theme="dark"] div[data-testid="stButton"] > button:not([kind="primary"]){
-  background:#202329 !important;
-  color:#f0f0f0 !important;
-  border-color:#3a3f47 !important;
-}
-
-html[data-theme="dark"] div[data-testid="stRadio"] label,
-html[data-theme="dark"] div[data-testid="stCheckbox"] label{
-  color:#f0f0f0 !important;
-}
-
-/* 手機 */
-@media (max-width:800px){
-  [data-testid="stAppViewContainer"] .main .block-container{
-    padding-left:.75rem !important;
-    padding-right:.75rem !important;
-  }
-}
-</style>
-""", unsafe_allow_html=True)
 
 st.markdown("""
 <style>
@@ -879,7 +663,7 @@ st.markdown("""<style>
 </style>""",unsafe_allow_html=True)
 
 st.markdown('<div class="v10-main-title">🎨 LINE 貼圖創作工作室</div>', unsafe_allow_html=True)
-st.caption("V11 STEP 02B-3A｜使用者自有 OpenAI API Session 安全架構")
+st.caption("V11 STEP 02C-1｜柔和 Light / Dark 主題最佳化｜使用者自有 OpenAI API Session 安全架構")
 st.divider()
 
 v10_section("📷 ① 上傳人物照片", "#ff5c7a")
@@ -1839,135 +1623,28 @@ div[data-testid="stLinkButton"] > a:hover {
 """, unsafe_allow_html=True)
 
 # ============================================================
-# V11｜STEP 02C-1 FIX3
-# Theme-variable based UI:
-# 不猜測 Streamlit 的 data-theme DOM 屬性，直接使用 Streamlit
-# 在 System / Light / Dark 切換時會更新的主題 CSS 變數。
+# ============================================================
+# V11｜STEP 02C-1 FIX4｜UI 主題交給 Streamlit 原生 Light/Dark
+# 不在 Python 內硬覆蓋 App 背景；避免「文字已變白、背景仍是白色」。
 # ============================================================
 st.markdown("""
 <style>
-/*
-  Streamlit theme variables:
-  --background-color
-  --secondary-background-color
-  --text-color
-  --primary-color
-
-  這一層放在所有舊 CSS 之後，避免舊版 hard-coded 白底覆蓋。
-*/
-
-/* 整個 App：背景跟著 Streamlit 主題 */
-html, body,
-[data-testid="stAppViewContainer"],
-[data-testid="stAppViewContainer"] > .main,
-[data-testid="stMain"],
-[data-testid="stHeader"]{
-  background-color:var(--background-color) !important;
-}
-
-/* Light：在 Streamlit 白底上加入很淡的暖灰感；
-   Dark：同一公式會以 dark 的 --background-color 為基準，不會變白。 */
-[data-testid="stAppViewContainer"],
-[data-testid="stMain"]{
-  background-color:color-mix(
-    in srgb,
-    var(--background-color) 92%,
-    #e8e2dc 8%
-  ) !important;
-}
-
-/* 內容容器透明，讓 App 背景統一 */
-[data-testid="stAppViewContainer"] .main .block-container{
-  background:transparent !important;
-}
-
-/* 主要文字完全跟隨 Streamlit 主題 */
-[data-testid="stAppViewContainer"] p,
-[data-testid="stAppViewContainer"] label,
-[data-testid="stAppViewContainer"] span,
-[data-testid="stAppViewContainer"] small,
-[data-testid="stAppViewContainer"] .stCaption,
-[data-testid="stAppViewContainer"] [data-testid="stMarkdownContainer"]{
-  color:var(--text-color) !important;
-}
-
-/* 次要文字 */
-[data-testid="stAppViewContainer"] .stCaption,
-[data-testid="stAppViewContainer"] small{
-  opacity:.82;
-}
-
-/* 卡片／Expander／上傳區：使用 Streamlit 的次背景 */
-div[data-testid="stExpander"],
-div[data-testid="stFileUploader"] section,
-div[data-testid="stVerticalBlockBorderWrapper"],
+/* 只處理我們自己建立的舊版自訂元件；不接管整個 Streamlit App。 */
 .v10-soft-box{
-  background-color:var(--secondary-background-color) !important;
-  border-color:color-mix(in srgb,var(--text-color) 18%, transparent) !important;
+  background:var(--secondary-background-color, #fafafa) !important;
+  border-color:var(--border-color, #e5e7eb) !important;
 }
 
-/* 輸入控制項：主題自動切換 */
-div[data-testid="stTextInput"] input,
-div[data-testid="stTextArea"] textarea,
-div[data-testid="stNumberInput"] input,
-div[data-testid="stSelectbox"] [data-baseweb="select"] > div,
-div[data-testid="stMultiSelect"] [data-baseweb="select"] > div{
-  background-color:var(--secondary-background-color) !important;
-  color:var(--text-color) !important;
-  border-color:color-mix(in srgb,var(--text-color) 18%, transparent) !important;
-}
-
-/* 上傳器內的文字與圖示跟隨主題 */
-div[data-testid="stFileUploader"] *,
-div[data-testid="stExpander"] *{
-  color:var(--text-color);
-}
-
-/* 一般按鈕跟隨主題；primary 保留原本主色 */
-div[data-testid="stButton"] > button:not([kind="primary"]){
-  background-color:var(--secondary-background-color) !important;
-  color:var(--text-color) !important;
-  border-color:color-mix(in srgb,var(--text-color) 18%, transparent) !important;
-}
-
-/* 原有 V10 自製 HTML 區塊也跟隨主題 */
-.help{
-  background:var(--secondary-background-color) !important;
-  color:var(--text-color) !important;
-}
-
-.help *,
-.v10-soft-box *,
 .v10-section-title,
 .v10-subsection,
 .v10-note{
-  color:var(--text-color);
+  color:var(--text-color, inherit);
 }
 
-/* Rainbow section 的彩色漸層保留，但透明度降低，避免 Dark 過亮 */
-.v10-section{
-  background:linear-gradient(
-    180deg,
-    color-mix(in srgb,var(--accent) 9%, transparent),
-    transparent
-  ) !important;
-}
-
-/* 原生 Canvas 區塊仍維持自己的功能色，不動生成邏輯 */
-.viewer{
-  background:var(--secondary-background-color);
-  border-color:color-mix(in srgb,var(--text-color) 35%, transparent);
-}
-
-/* 手機 */
-@media (max-width:800px){
-  [data-testid="stAppViewContainer"] .main .block-container{
-    padding-left:.75rem !important;
-    padding-right:.75rem !important;
-  }
-}
+/* section 的彩色框線保留原本設計，不設定整頁背景。 */
 </style>
 """, unsafe_allow_html=True)
+
 
 
 st.markdown('<div style="height: 20px;"></div>', unsafe_allow_html=True)
