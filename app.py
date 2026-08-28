@@ -264,7 +264,7 @@ def _v11_user_error_message(exc: Exception) -> str:
 # ============================================================
 
 st.set_page_config(
-    page_title="LINE 貼圖創作工作室｜V11",
+    page_title="LINE 貼圖創作工作室｜V12",
     page_icon="🎨",
     layout="wide",
 )
@@ -815,6 +815,92 @@ CHARACTER_OPTIONS = [
     "LINE貼圖風","柔和光影",
 ]
 
+
+# ============================================================
+# V12｜STEP 01A①
+# Project 基礎資料骨架
+#
+# 本階段只建立「目前作品」的 Session 架構與 UI 導航。
+# 尚未寫入 Supabase / 伺服器 / 永久資料庫。
+# API Key 絕不納入 Project。
+# ============================================================
+from datetime import datetime
+from uuid import uuid4
+
+def _v12_now_iso():
+    return datetime.now().astimezone().isoformat(timespec="seconds")
+
+def _v12_new_project_metadata():
+    now = _v12_now_iso()
+    return {
+        "project_id": str(uuid4()),
+        "project_name": "",
+        "style_name": "",
+        "font_name": "",
+        "text_style": "",
+        "created_at": now,
+        "updated_at": now,
+        # 後續 STEP 01A②～⑤ 逐步填入；本階段不永久保存。
+        "generation_method": "",
+        "transparent_background": False,
+        "sticker_texts": [""] * 8,
+        "source_image": None,
+        "generated_grid": None,
+        "stickers": [],
+        "main_image": None,
+        "tab_image": None,
+    }
+
+st.session_state.setdefault("v12_current_project", _v12_new_project_metadata())
+st.session_state.setdefault("v12_projects_local_index", [])
+
+def _v12_current_project():
+    project = st.session_state.get("v12_current_project")
+    if not isinstance(project, dict):
+        project = _v12_new_project_metadata()
+        st.session_state["v12_current_project"] = project
+    return project
+
+def _v12_project_snapshot():
+    """取得目前作品的可保存 metadata 快照；絕不包含 API Key。"""
+    project = dict(_v12_current_project())
+    project["updated_at"] = _v12_now_iso()
+    project["sticker_texts"] = [
+        str(st.session_state.get(f"sticker_text_{i}", ""))
+        for i in range(8)
+    ]
+    project["transparent_background"] = bool(
+        st.session_state.get("transparent_png_option", False)
+    )
+    project["style_name"] = str(
+        st.session_state.get("v10_style_mode", project.get("style_name", ""))
+    )
+    project["text_style"] = str(
+        st.session_state.get("v8_text_style", project.get("text_style", ""))
+    )
+    selected_font = st.session_state.get("v8_selected_font")
+    if selected_font:
+        try:
+            project["font_name"] = (
+                f"{int(selected_font):03d}｜"
+                f"{V8_TEXT_EFFECT_CATALOG[int(selected_font)]}"
+            )
+        except Exception:
+            project["font_name"] = str(selected_font)
+    else:
+        project["font_name"] = ""
+
+    # 僅記錄生成方式，不記錄 API Key。
+    api_mode = str(st.session_state.get("public_api_mode", ""))
+    if "自己的" in api_mode:
+        project["generation_method"] = "own_api"
+    elif "免費" in api_mode or "網站" in api_mode:
+        project["generation_method"] = "website_api"
+
+    st.session_state["v12_current_project"] = project
+    return dict(project)
+
+
 for i in range(8):
     st.session_state.setdefault(f"sticker_text_{i}", "")
 st.session_state.setdefault("uploaded_image_bytes", None)
@@ -878,6 +964,72 @@ st.markdown("""<style>
 .v10-rainbow-title{padding:8px 14px;border-radius:12px;margin:8px 0 12px;font-weight:700;background:linear-gradient(90deg,#fff1f2,#fff7ed,#fefce8,#f0fdf4,#eff6ff,#f5f3ff);}
 .v10-soft-box{padding:8px 12px;border-radius:10px;background:#fafafa;border:1px solid #e5e7eb;}
 </style>""",unsafe_allow_html=True)
+
+
+# ============================================================
+# V12｜STEP 01A①
+# 主導航：開始製作 / 我的作品
+# ============================================================
+st.markdown(
+    """
+    <style>
+    .v12-nav-wrap{
+      width:min(920px,100%);
+      margin:0 auto 1.1rem;
+      padding:.45rem;
+      border:1px solid rgba(120,120,120,.16);
+      border-radius:18px;
+      background:color-mix(in srgb,#64748b 6%, transparent);
+    }
+    </style>
+    <div class="v12-nav-wrap"></div>
+    """,
+    unsafe_allow_html=True,
+)
+
+_v12_nav_cols = st.columns(2)
+with _v12_nav_cols[0]:
+    if st.button("✨ 開始製作", key="v12_nav_create", use_container_width=True):
+        st.session_state["v12_view"] = "create"
+        st.rerun()
+with _v12_nav_cols[1]:
+    if st.button("📚 我的作品", key="v12_nav_library", use_container_width=True):
+        st.session_state["v12_view"] = "library"
+        st.rerun()
+
+st.session_state.setdefault("v12_view", "create")
+
+if st.session_state["v12_view"] == "library":
+    st.markdown('<div class="v10-main-title">📚 我的作品</div>', unsafe_allow_html=True)
+    st.caption("這裡將顯示目前瀏覽器中保存的作品。作品不會寫入網站的每日 AI 額度資料。")
+
+    _search_name = st.text_input(
+        "🔎 搜尋作品名稱",
+        placeholder="輸入作品名稱搜尋…",
+        key="v12_project_search",
+    )
+
+    _projects = list(st.session_state.get("v12_projects_local_index", []))
+    if _search_name.strip():
+        needle = _search_name.strip().lower()
+        _projects = [
+            p for p in _projects
+            if needle in str(p.get("project_name", "")).lower()
+        ]
+
+    if not _projects:
+        st.info("📭 目前還沒有保存的作品")
+        st.markdown(
+            """
+            完成一組貼圖後，它會出現在這裡。  
+            下一步會逐步加入「作品名稱、瀏覽器本機暫存、作品縮圖與作品詳情」。
+            """
+        )
+
+    st.divider()
+    st.caption("V12｜STEP 01A①：目前只建立作品庫導航與 Project 資料骨架，尚未啟用永久保存。")
+    st.stop()
+
 
 st.markdown('<div class="v10-main-title">🎨 LINE 貼圖創作工作室</div>', unsafe_allow_html=True)
 st.caption("V11｜公開版｜快速完成 LINE 貼圖創作")
