@@ -1004,8 +1004,24 @@ CHARACTER_OPTIONS = [
 # 尚未寫入 Supabase / 伺服器 / 永久資料庫。
 # API Key 絕不納入 Project。
 # ============================================================
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from uuid import uuid4
+
+_V12_TAIPEI_TZ = timezone(timedelta(hours=8))
+
+def _v12_format_display_time(value):
+    """將作品時間轉成使用者容易閱讀的台灣時間格式。"""
+    raw = str(value or "").strip()
+    if not raw:
+        return "未記錄"
+    try:
+        dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        if dt.tzinfo is not None:
+            dt = dt.astimezone(_V12_TAIPEI_TZ)
+        return dt.strftime("%Y/%m/%d %H:%M")
+    except Exception:
+        return raw
+
 
 def _v12_now_iso():
     return datetime.now().astimezone().isoformat(timespec="seconds")
@@ -1412,6 +1428,36 @@ st.markdown(
       border-radius:18px;
       background:color-mix(in srgb,#64748b 6%, transparent);
     }
+
+    /* V12｜01B① UI 微調：主導航與 LINE 連結按鈕使用同一套紅色視覺。 */
+    .st-key-v12_nav_create button,
+    .st-key-v12_nav_library button,
+    .st-key-v12_footer_library button{
+      width:100% !important;
+      min-height:52px !important;
+      border-radius:10px !important;
+      font-size:18px !important;
+      font-weight:800 !important;
+      background:#FF4B4B !important;
+      background-color:#FF4B4B !important;
+      color:#FFFFFF !important;
+      border:1px solid #FF4B4B !important;
+      box-shadow:none !important;
+    }
+    .st-key-v12_nav_create button:hover,
+    .st-key-v12_nav_library button:hover,
+    .st-key-v12_footer_library button:hover{
+      background:#FF3333 !important;
+      background-color:#FF3333 !important;
+      border-color:#FF3333 !important;
+      color:#FFFFFF !important;
+    }
+    .st-key-v12_nav_create button p,
+    .st-key-v12_nav_library button p,
+    .st-key-v12_footer_library button p{
+      color:#FFFFFF !important;
+      font-weight:800 !important;
+    }
     </style>
     <div class="v12-nav-wrap"></div>
     """,
@@ -1489,7 +1535,7 @@ if st.session_state["v12_view"] == "library":
                 if _meta_parts:
                     st.caption("　｜　".join(_meta_parts))
 
-                st.caption(f"最後打包：{_project.get('updated_at', '')}")
+                st.caption(f"最後打包：{_v12_format_display_time(_project.get('updated_at', ''))}")
 
                 _act1, _act2, _act3 = st.columns(3)
                 with _act1:
@@ -2699,6 +2745,18 @@ st.markdown("""
 st.markdown('<div style="height: 20px;"></div>', unsafe_allow_html=True)
 _link_col = st.columns([1, 2, 1])[1]
 with _link_col:
+    if st.button(
+        "📚 我的作品",
+        key="v12_footer_library",
+        use_container_width=True,
+    ):
+        _public02a_sync_style_bank_from_widgets()
+        _save_v10_presets()
+        st.session_state["v12_view"] = "library"
+        st.rerun()
+
+    st.markdown('<div style="height: 10px;"></div>', unsafe_allow_html=True)
+
     st.link_button(
         "🔗 連結 LINE 貼圖網頁",
         "https://creator.line.me/zh-hant/",
