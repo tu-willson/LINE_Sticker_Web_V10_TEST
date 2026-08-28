@@ -1,4 +1,4 @@
-# V11｜STEP 02C-3C｜等待進度提示＋180 秒逾時保護
+# V11｜STEP 02C-3D｜等待進度提示＋180 秒逾時保護
 import re
 import zipfile
 import streamlit as st
@@ -296,7 +296,7 @@ st.markdown("""
   padding:.45rem .75rem;
   text-align:center;
 }
-/* V11｜02C-3C｜透明背景選項專用穩定 CSS scope */
+/* V11｜02C-3D｜透明背景選項專用穩定 CSS scope */
 .st-key-transparent_png_option{
   width:min(900px,100%);
   margin:.35rem auto 1.25rem;
@@ -319,28 +319,28 @@ st.markdown("""
 
 .st-key-transparent_png_option [data-testid="stCheckbox"] label p{
   margin:0 !important;
-  font-size:2.5rem !important;
+  font-size:2rem !important;
   line-height:1.2 !important;
   font-weight:900 !important;
 }
 
 .st-key-transparent_png_option [data-testid="stCheckbox"] label span{
-  font-size:2.5rem !important;
+  font-size:2rem !important;
   font-weight:900 !important;
 }
 
 .st-key-transparent_png_option [data-testid="stCheckbox"] [role="checkbox"]{
-  min-width:2.6rem !important;
-  width:2.6rem !important;
-  min-height:2.6rem !important;
-  height:2.6rem !important;
+  min-width:2.1rem !important;
+  width:2.1rem !important;
+  min-height:2.1rem !important;
+  height:2.1rem !important;
   transform:scale(1.15);
   transform-origin:center;
 }
 
 .st-key-transparent_png_option [data-testid="stCheckbox"] input{
-  width:2.5rem !important;
-  height:2.5rem !important;
+  width:2rem !important;
+  height:2rem !important;
   cursor:pointer !important;
 }
 
@@ -352,7 +352,7 @@ st.markdown("""
   border-radius:10px;
   background:color-mix(in srgb,#16a085 10%, transparent);
   color:var(--text-color, inherit);
-  font-size:2.5rem !important;
+  font-size:2rem !important;
   line-height:1.2 !important;
   font-weight:900 !important;
   text-align:left;
@@ -362,14 +362,14 @@ st.markdown("""
   text-align:center !important;
 }
 .v10-transparent-box label{
-  font-size:2.5rem !important;
+  font-size:2rem !important;
   font-weight:900 !important;
   line-height:1.25 !important;
   cursor:pointer !important;
 }
 .v10-transparent-box label p,
 .v10-transparent-box label span{
-  font-size:2.5rem !important;
+  font-size:2rem !important;
   font-weight:900 !important;
 }
 .v10-transparent-box div[data-testid="stCheckbox"] input{
@@ -1054,7 +1054,7 @@ with st.expander("🔎 已選字型大圖", expanded=False):
 
 st.divider()
 v10_section("🌈 ⑥ 背景設定", "#16a085")
-st.markdown('<div class="v11-transparent-title">🪄 透明背景</div>', unsafe_allow_html=True)
+st.markdown('<div class="v11-transparent-title">🖼️ 透明背景</div>', unsafe_allow_html=True)
 with st.container(key="transparent_png_option"):
     transparent = st.checkbox("使用透明背景 PNG", value=False)
 
@@ -1603,7 +1603,7 @@ if st.session_state.generated_4x2_bytes:
     with _main_tab_cols[2]:
         st.markdown("### 📦 完整套件")
     with _main_tab_cols[3]:
-        st.markdown("### 🪄 透明背景")
+        st.markdown("### 🖼️ 透明背景")
 
     cmain, ctab = st.columns(2)
     with cmain:
