@@ -102,6 +102,78 @@ def _public02a_apply_settings(data):
     return True
 
 
+def _public02a_default_style_bank():
+    return {
+        str(i): {
+            "name": f"使用者自定{i}",
+            "prompt": "",
+        }
+        for i in range(1, 11)
+    }
+
+
+def _public02a_normalize_style_bank(data):
+    base = _public02a_default_style_bank()
+    if not isinstance(data, dict):
+        return base
+    for i in range(1, 11):
+        row = data.get(str(i), data.get(i, {}))
+        if isinstance(row, dict):
+            name = str(row.get("name", "") or "").strip()
+            prompt = str(row.get("prompt", "") or "").strip()
+            if name:
+                base[str(i)]["name"] = name
+            if prompt:
+                base[str(i)]["prompt"] = prompt
+    return base
+
+
+def _public02a_get_style_bank():
+    bank = _public02a_normalize_style_bank(
+        st.session_state.get("public02a_style_bank")
+    )
+    st.session_state["public02a_style_bank"] = bank
+    return bank
+
+
+def _public02a_set_style_bank(bank):
+    st.session_state["public02a_style_bank"] = _public02a_normalize_style_bank(bank)
+
+
+def _public02a_sync_style_bank_from_widgets():
+    """Authoritative FIX11 merge.
+
+    The style bank is independent from the combined preset store. Existing
+    prompts are never erased merely because conditional Streamlit widgets
+    disappeared. Only non-empty editor values may update a saved slot.
+    """
+    bank = _public02a_get_style_bank()
+
+    for i in range(1, 11):
+        name_key = f"v10_style_name_{i}"
+        prompt_key = f"v10_style_custom_{i}"
+
+        if name_key in st.session_state:
+            name = str(st.session_state[name_key] or "").strip()
+            if name:
+                bank[str(i)]["name"] = name
+
+        if prompt_key in st.session_state:
+            prompt = str(st.session_state[prompt_key] or "").strip()
+            if prompt:
+                bank[str(i)]["prompt"] = prompt
+
+    _public02a_set_style_bank(bank)
+
+    # Keep legacy/combined store in sync for export and other old code.
+    combined = _public02a_get_preset_store()
+    for i in range(1, 11):
+        combined["style_custom_names"][i - 1] = bank[str(i)]["name"]
+        combined["style_custom"][i - 1] = bank[str(i)]["prompt"]
+    _public02a_set_preset_store(combined)
+    return bank
+
+
 def _public02a_init():
     # V12 FIX4：非 Widget 的個人設定 store。
     # 公開版不能直接把所有訪客資料寫進共用 v10_data，
@@ -116,9 +188,30 @@ def _public02a_init():
         },
     )
 
+    # FIX11: custom style prompts have their own authoritative bank.
+    if "public02a_style_bank" not in st.session_state:
+        _seed = _public02a_normalize_settings(
+            st.session_state.get("public02a_user_presets")
+        )
+        _public02a_set_style_bank({
+            str(i): {
+                "name": _seed["style_custom_names"][i - 1],
+                "prompt": _seed["style_custom"][i - 1],
+            }
+            for i in range(1, 11)
+        })
+
+    # Sync any still-existing editor values BEFORE Streamlit can discard
+    # conditional widget state at the end of a navigation rerun.
+    _public02a_sync_style_bank_from_widgets()
+
     defaults = _public02a_normalize_settings(
         st.session_state.get("public02a_user_presets")
     )
+    _style_bank_defaults = _public02a_get_style_bank()
+    for _i in range(1, 11):
+        defaults["style_custom_names"][_i - 1] = _style_bank_defaults[str(_i)]["name"]
+        defaults["style_custom"][_i - 1] = _style_bank_defaults[str(_i)]["prompt"]
 
     # Apply an imported profile BEFORE the corresponding Streamlit widgets are instantiated.
     pending = st.session_state.pop("public02a_pending_import", None)
@@ -138,6 +231,13 @@ def _public02a_init():
             st.session_state[f"v10_character_custom_{i}"] = pending["character_custom"][i - 1]
             st.session_state[f"v10_character_enabled_{i}"] = pending["character_enabled"][i - 1]
         st.session_state["public02a_custom_phrases"] = list(pending["custom_phrases"])
+        _public02a_set_style_bank({
+            str(i): {
+                "name": pending["style_custom_names"][i - 1],
+                "prompt": pending["style_custom"][i - 1],
+            }
+            for i in range(1, 11)
+        })
 
     # V12 FIX5｜關鍵修正：
     # Streamlit 切到「我的作品」後，創作頁的 widget key 可能被移除，
@@ -242,6 +342,8 @@ def _load_v10_presets():
 
 def _save_v10_presets():
     try:
+        # FIX11: first synchronize the dedicated style bank.
+        _public02a_sync_style_bank_from_widgets()
         existing = _public02a_get_preset_store()
         snapshot = {
             "style_custom": list(existing["style_custom"]),
@@ -1189,7 +1291,9 @@ with _v12_nav_cols[0]:
         st.rerun()
 with _v12_nav_cols[1]:
     if st.button("📚 我的作品", key="v12_nav_library", use_container_width=True):
-        # 離開創作頁前同步目前自定義風格到非 Widget 個人設定 store。
+        # FIX11: leave-create navigation explicitly commits the dedicated style bank
+        # before conditional editor widgets disappear.
+        _public02a_sync_style_bank_from_widgets()
         _save_v10_presets()
         st.session_state["v12_view"] = "library"
         st.rerun()
@@ -1365,9 +1469,11 @@ if style_mode=="⭐ 自定義風格":
     # Streamlit 會在 rerun 後清除這些 widget key。
     #
     # 因此作品真正的已儲存風格一律從非 Widget store 讀取。
-    _preset_store = _public02a_get_preset_store()
-    _preset_names = list(_preset_store["style_custom_names"])
-    _preset_styles = list(_preset_store["style_custom"])
+    # FIX11: UI reads custom styles directly from the dedicated style bank,
+    # never from conditional editor widget keys.
+    _style_bank = _public02a_get_style_bank()
+    _preset_names = [_style_bank[str(_i)]["name"] for _i in range(1, 11)]
+    _preset_styles = [_style_bank[str(_i)]["prompt"] for _i in range(1, 11)]
 
     _custom_style_slots=[]
     for _i in range(1,11):
@@ -1409,12 +1515,14 @@ if style_mode=="⭐ 自定義風格":
                 st.text_input(
                     f"名稱 {_i:02d}",
                     key=f"v10_style_name_{_i}",
+                    on_change=_public02a_sync_style_bank_from_widgets,
                 )
             with _b:
                 st.text_area(
                     f"自定義風格 {_i:02d}",
                     key=f"v10_style_custom_{_i}",
                     height=65,
+                    on_change=_public02a_sync_style_bank_from_widgets,
                 )
 
         if st.button("💾 儲存 10 組自定風格",key="v10_save_styles",use_container_width=True):
