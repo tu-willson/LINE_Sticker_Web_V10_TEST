@@ -141,37 +141,53 @@ def _public02a_set_style_bank(bank):
 
 
 def _public02a_sync_style_bank_from_widgets():
-    """Authoritative FIX11 merge.
+    """V12 REFACTOR compatibility shim.
 
-    The style bank is independent from the combined preset store. Existing
-    prompts are never erased merely because conditional Streamlit widgets
-    disappeared. Only non-empty editor values may update a saved slot.
+    The old 10-slot conditional widgets are no longer the source of truth.
+    Custom styles are now managed through one fixed editor + Style Bank.
+    Keeping this function non-destructive prevents stale/blank legacy widget
+    keys from overwriting saved prompts during page navigation.
     """
+    return _public02a_get_style_bank()
+
+
+def _v12_load_style_editor_from_slot():
+    """Load the selected Style Bank slot into the single fixed editor."""
+    try:
+        slot = int(st.session_state.get("v12_style_editor_slot", 1))
+    except Exception:
+        slot = 1
+    slot = max(1, min(10, slot))
+
     bank = _public02a_get_style_bank()
+    item = bank[str(slot)]
 
-    for i in range(1, 11):
-        name_key = f"v10_style_name_{i}"
-        prompt_key = f"v10_style_custom_{i}"
+    st.session_state["v12_style_editor_name"] = str(item.get("name", "")).strip() or f"使用者自定{slot}"
+    st.session_state["v12_style_editor_prompt"] = str(item.get("prompt", ""))
 
-        if name_key in st.session_state:
-            name = str(st.session_state[name_key] or "").strip()
-            if name:
-                bank[str(i)]["name"] = name
 
-        if prompt_key in st.session_state:
-            prompt = str(st.session_state[prompt_key] or "").strip()
-            if prompt:
-                bank[str(i)]["prompt"] = prompt
+def _v12_save_style_editor():
+    """Save only the single editor into the selected Style Bank slot."""
+    try:
+        slot = int(st.session_state.get("v12_style_editor_slot", 1))
+    except Exception:
+        slot = 1
+    slot = max(1, min(10, slot))
 
+    bank = _public02a_get_style_bank()
+    name = str(st.session_state.get("v12_style_editor_name", "")).strip() or f"使用者自定{slot}"
+    prompt = str(st.session_state.get("v12_style_editor_prompt", "")).strip()
+
+    bank[str(slot)] = {
+        "name": name,
+        "prompt": prompt,
+    }
     _public02a_set_style_bank(bank)
 
-    # IMPORTANT FIX11A:
-    # This function is called during _public02a_init(), before the legacy
-    # combined preset-store helper functions are defined later in the file.
-    # Therefore it must only synchronize the dedicated Style Bank here.
-    # The combined legacy store is synchronized later by _save_v10_presets()
-    # and by the normal creation-page flow, after all helpers are defined.
-    return bank
+    # Keep the legacy combined structure synchronized, but derive it only
+    # from the authoritative Style Bank.
+    _save_v10_presets()
+    return True
 
 
 def _public02a_init():
@@ -342,15 +358,9 @@ def _load_v10_presets():
 
 def _save_v10_presets():
     try:
-        # FIX11B｜先把仍存在的 Widget 合併進 Style Bank。
-        _public02a_sync_style_bank_from_widgets()
-
-        # Style Bank 是風格資料的唯一權威來源。
-        # 每次儲存時，必須反向完整寫回 legacy/combined store，
-        # 否則 Style Bank 若因部署／Session 重建而重新初始化，
-        # 就會從舊的「使用者自定1 + 空 Prompt」資料重新播種。
+        # V12 REFACTOR｜Style Bank is authoritative.
+        # Never read legacy conditional style widgets here.
         bank = _public02a_get_style_bank()
-        existing = _public02a_get_preset_store()
 
         snapshot = {
             "style_custom": [
@@ -372,17 +382,6 @@ def _save_v10_presets():
         }
 
         _public02a_set_preset_store(snapshot)
-
-        # 再把兩個資料來源同步成同一份資料，避免下一次初始化
-        # 從 combined store 取得舊的預設值。
-        _public02a_set_style_bank({
-            str(i): {
-                "name": snapshot["style_custom_names"][i - 1],
-                "prompt": snapshot["style_custom"][i - 1],
-            }
-            for i in range(1, 11)
-        })
-
         st.session_state["public02a_last_preset_snapshot"] = _public02a_get_preset_store()
         return True
     except Exception:
@@ -1477,77 +1476,89 @@ if style_mode=="⭐ 自定義風格":
     style="↓ 請選擇風格"
     st.success("✨ 已切換到「自定義風格」模式")
 
-    # V12 FIX6｜關鍵修正：
-    # 「已儲存風格」不能再從條件式 widget key 當資料來源。
-    # 因為切回一般風格時，v10_style_* widget 不會被渲染，
-    # Streamlit 會在 rerun 後清除這些 widget key。
-    #
-    # 因此作品真正的已儲存風格一律從非 Widget store 讀取。
-    # FIX11: UI reads custom styles directly from the dedicated style bank,
-    # never from conditional editor widget keys.
+    # V12 REFACTOR｜Style Bank is the only source of truth.
     _style_bank = _public02a_get_style_bank()
-    _preset_names = [_style_bank[str(_i)]["name"] for _i in range(1, 11)]
-    _preset_styles = [_style_bank[str(_i)]["prompt"] for _i in range(1, 11)]
+    _custom_style_slots = [
+        (_i, str(_style_bank[str(_i)]["name"]).strip() or f"使用者自定{_i}",
+         str(_style_bank[str(_i)]["prompt"]).strip())
+        for _i in range(1, 11)
+        if str(_style_bank[str(_i)]["prompt"]).strip()
+    ]
 
-    _custom_style_slots=[]
-    for _i in range(1,11):
-        _sv=str(_preset_styles[_i-1]).strip()
-        _sn=str(_preset_names[_i-1]).strip() or f"使用者自定{_i}"
-        if _sv:
-            _custom_style_slots.append((_i,_sn,_sv))
-
-    _saved_labels=["✏️ 尚未選擇／新增"]+[f"{i:02d}｜{name}" for i,name,_ in _custom_style_slots]
-    _saved_choice=st.selectbox(
+    _saved_labels = ["↓ 請選擇已儲存風格"] + [
+        f"{i:02d}｜{name}" for i, name, _ in _custom_style_slots
+    ]
+    _saved_choice = st.selectbox(
         "💾 選擇已儲存的自定義風格",
         _saved_labels,
-        key="v10_saved_custom_style_choice",
+        key="v12_saved_custom_style_choice",
     )
 
-    if _saved_choice!="✏️ 尚未選擇／新增":
-        _pos=_saved_labels.index(_saved_choice)-1
-        custom_style=_custom_style_slots[_pos][2]
+    custom_style = ""
+    if _saved_choice != "↓ 請選擇已儲存風格":
+        _pos = _saved_labels.index(_saved_choice) - 1
+        custom_style = _custom_style_slots[_pos][2]
         st.info(f"💾 已套用：{_custom_style_slots[_pos][0]:02d}｜{_custom_style_slots[_pos][1]}")
     else:
-        custom_style=""
+        st.info("👆 請選擇一個已儲存風格；或先在下方建立新的風格。")
 
-    with st.expander("💾 編輯／儲存自定義風格 1～10",expanded=False):
-        # 編輯器 Widget 僅是畫面；真正資料仍以 _preset_store 為準。
-        # 若跨頁後 widget key 已被 Streamlit 清除，這裡在建立 widget 前補回。
-        for _i in range(1,11):
-            st.session_state.setdefault(
-                f"v10_style_name_{_i}",
-                str(_preset_names[_i-1]) or f"使用者自定{_i}",
-            )
-            st.session_state.setdefault(
-                f"v10_style_custom_{_i}",
-                str(_preset_styles[_i-1]),
-            )
+    # Single fixed editor: only two text widgets are ever used.
+    with st.expander("✏️ 管理我的自定義風格", expanded=False):
+        st.caption("選擇 01～10 的一個位置進行編輯。風格內容只儲存在 Style Bank，不依賴 10 組條件式 Widget。")
 
-        for _i in range(1,11):
-            _a,_b=st.columns([1,4])
-            with _a:
-                st.text_input(
-                    f"名稱 {_i:02d}",
-                    key=f"v10_style_name_{_i}",
-                    on_change=_public02a_sync_style_bank_from_widgets,
-                )
-            with _b:
-                st.text_area(
-                    f"自定義風格 {_i:02d}",
-                    key=f"v10_style_custom_{_i}",
-                    height=65,
-                    on_change=_public02a_sync_style_bank_from_widgets,
-                )
+        # Initialize the fixed editor before creating its widgets.
+        st.session_state.setdefault("v12_style_editor_slot", 1)
+        if (
+            "v12_style_editor_name" not in st.session_state
+            or "v12_style_editor_prompt" not in st.session_state
+        ):
+            _v12_load_style_editor_from_slot()
 
-        if st.button("💾 儲存 10 組自定風格",key="v10_save_styles",use_container_width=True):
-            # FIX10：採用非破壞式合併保存，空白 Widget 不得覆蓋既有 Prompt。
-            if _save_v10_presets():
-                st.success("✅ 10 組自定風格已儲存")
+        st.selectbox(
+            "📁 編輯哪一組風格",
+            list(range(1, 11)),
+            format_func=lambda x: f"{x:02d}｜{str(_public02a_get_style_bank()[str(x)]['name']).strip() or f'使用者自定{x}'}",
+            key="v12_style_editor_slot",
+            on_change=_v12_load_style_editor_from_slot,
+        )
+
+        st.text_input(
+            "🏷️ 風格名稱",
+            key="v12_style_editor_name",
+            placeholder="例如：童趣手繪漫畫",
+        )
+
+        st.text_area(
+            "🎨 自定義風格 Prompt",
+            key="v12_style_editor_prompt",
+            height=180,
+            placeholder="在這裡輸入完整的風格 Prompt…",
+        )
+
+        _ea, _eb = st.columns(2)
+        with _ea:
+            if st.button("💾 儲存此風格", key="v12_save_single_style", use_container_width=True):
+                _v12_save_style_editor()
+                st.success("✅ 此風格已儲存")
                 st.rerun()
-            else:
-                st.error("❌ 儲存失敗")
+        with _eb:
+            if st.button("🧹 清空此風格", key="v12_clear_single_style", use_container_width=True):
+                try:
+                    _slot = int(st.session_state.get("v12_style_editor_slot", 1))
+                except Exception:
+                    _slot = 1
+                _bank = _public02a_get_style_bank()
+                _bank[str(_slot)] = {
+                    "name": f"使用者自定{_slot}",
+                    "prompt": "",
+                }
+                _public02a_set_style_bank(_bank)
+                _save_v10_presets()
+                _v12_load_style_editor_from_slot()
+                st.success("🧹 此風格已清空")
+                st.rerun()
 
-    st.warning("ℹ️ 目前只使用「自定義風格」，不會同時套用其他 預設風格。")
+    st.warning("ℹ️ 目前只使用「自定義風格」，不會同時套用其他預設風格。")
 else:
     style=style_mode
     custom_style=""
