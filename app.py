@@ -1,4 +1,4 @@
-# V11｜STEP 02C-3B｜等待進度提示＋180 秒逾時保護
+# V11｜STEP 02C-3C｜等待進度提示＋180 秒逾時保護
 import re
 import zipfile
 import streamlit as st
@@ -295,6 +295,67 @@ st.markdown("""
   margin:0 auto 1rem;
   padding:.45rem .75rem;
   text-align:center;
+}
+/* V11｜02C-3C｜透明背景選項專用穩定 CSS scope */
+.st-key-transparent_png_option{
+  width:min(900px,100%);
+  margin:.35rem auto 1.25rem;
+  padding:.65rem 1rem;
+  text-align:center;
+}
+
+.st-key-transparent_png_option [data-testid="stCheckbox"]{
+  width:100% !important;
+}
+
+.st-key-transparent_png_option [data-testid="stCheckbox"] label{
+  display:flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  gap:1rem !important;
+  width:100% !important;
+  cursor:pointer !important;
+}
+
+.st-key-transparent_png_option [data-testid="stCheckbox"] label p{
+  margin:0 !important;
+  font-size:2.5rem !important;
+  line-height:1.2 !important;
+  font-weight:900 !important;
+}
+
+.st-key-transparent_png_option [data-testid="stCheckbox"] label span{
+  font-size:2.5rem !important;
+  font-weight:900 !important;
+}
+
+.st-key-transparent_png_option [data-testid="stCheckbox"] [role="checkbox"]{
+  min-width:2.6rem !important;
+  width:2.6rem !important;
+  min-height:2.6rem !important;
+  height:2.6rem !important;
+  transform:scale(1.15);
+  transform-origin:center;
+}
+
+.st-key-transparent_png_option [data-testid="stCheckbox"] input{
+  width:2.5rem !important;
+  height:2.5rem !important;
+  cursor:pointer !important;
+}
+
+.v11-transparent-title{
+  width:min(900px,100%);
+  margin:1.25rem auto .55rem;
+  padding:.7rem 1rem;
+  border-left:8px solid #16a085;
+  border-radius:10px;
+  background:color-mix(in srgb,#16a085 10%, transparent);
+  color:var(--text-color, inherit);
+  font-size:2.5rem !important;
+  line-height:1.2 !important;
+  font-weight:900 !important;
+  text-align:left;
 }
 .v10-transparent-box div[data-testid="stCheckbox"]{
   width:100% !important;
@@ -993,9 +1054,8 @@ with st.expander("🔎 已選字型大圖", expanded=False):
 
 st.divider()
 v10_section("🌈 ⑥ 背景設定", "#16a085")
-v10_subsection("🪄 透明背景", "#16a085")
-_tb1,_tb2,_tb3=st.columns([1,2,1])
-with _tb2:
+st.markdown('<div class="v11-transparent-title">🪄 透明背景</div>', unsafe_allow_html=True)
+with st.container(key="transparent_png_option"):
     transparent = st.checkbox("使用透明背景 PNG", value=False)
 
 v10_subsection("🌈 貼圖設定查看", "#ff9f43")
