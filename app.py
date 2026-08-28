@@ -1,4 +1,4 @@
-# V11｜STEP 02C-4③｜等待進度提示＋180 秒逾時保護
+# V11｜STEP 02C-4④｜等待進度提示＋180 秒逾時保護
 import re
 import zipfile
 import streamlit as st
@@ -211,6 +211,15 @@ def _save_v10_presets():
 # 舊版 v10_data/ 仍保留在專案中，作為備份資料，不由公開版讀寫。
 
 import streamlit.components.v1 as components
+
+def _v11_clear_generation_state() -> None:
+    """Clear only transient generation UI/session flags after a terminal outcome."""
+    for _key in (
+        "v11_generation_pending",
+        "v11_generation_in_progress",
+    ):
+        st.session_state.pop(_key, None)
+
 
 
 def _v11_user_error_message(exc: Exception) -> str:
@@ -1487,7 +1496,7 @@ if st.session_state.get("v11_generation_pending", False):
                 output_format="png",
             )
 
-                # V11｜02C-4③｜異常回應資料防護
+                # V11｜02C-4④｜異常回應資料防護
                 # API 呼叫成功不代表一定取得有效圖片；空 data / 缺少 b64_json
                 # 必須視為生成失敗，交回原本的 exception / refund 流程。
                 if not getattr(result, "data", None):
@@ -1507,7 +1516,8 @@ if st.session_state.get("v11_generation_pending", False):
             except Exception as _gen_exc:
                 _elapsed = time.monotonic() - _started_at
                 if _elapsed >= 180:
-                    raise TimeoutError("AI 生成逾時（超過 3 分鐘），請重新操作。") from _gen_exc
+                    _v11_clear_generation_state()
+                raise TimeoutError("AI 生成逾時（超過 3 分鐘），請重新操作。") from _gen_exc
                 raise
             raw = base64.b64decode(result.data[0].b64_json)
             img = Image.open(BytesIO(raw)).convert("RGBA")
