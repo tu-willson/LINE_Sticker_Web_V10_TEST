@@ -1,4 +1,4 @@
-# V11｜STEP 02D-1｜首次使用流程與 UX 整理
+# V11｜STEP 02D-2｜生成後流程與下載 UX 整理
 import re
 import zipfile
 import streamlit as st
@@ -294,6 +294,46 @@ st.markdown("""
   padding-right:2rem !important;
 }
 
+
+/* V11｜02D-2｜生成後流程導引 */
+.v11-postgen-guide{
+  width:min(1080px,100%);
+  margin:1rem auto 1.25rem;
+  padding:1rem 1.1rem;
+  border-radius:18px;
+  border:1px solid rgba(120,120,120,.18);
+  background:color-mix(in srgb,#16a085 8%, transparent);
+}
+.v11-postgen-title{
+  text-align:center;
+  font-size:clamp(1.15rem,2.2vw,1.55rem);
+  font-weight:900;
+  margin:.05rem 0 .8rem;
+}
+.v11-postgen-steps{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:.7rem;
+}
+.v11-postgen-step{
+  padding:.75rem .85rem;
+  border-radius:14px;
+  border:1px solid rgba(120,120,120,.12);
+  background:color-mix(in srgb,#ffffff 58%, transparent);
+}
+.v11-postgen-step strong{
+  display:block;
+  margin-bottom:.2rem;
+  font-size:1.02rem;
+}
+.v11-postgen-step span{
+  font-size:.96rem;
+  line-height:1.5;
+  opacity:.9;
+}
+@media (max-width:720px){
+  .v11-postgen-steps{grid-template-columns:1fr;}
+}
 /* V11｜02D-1｜首次使用導引 */
 .v11-onboarding{
   width:min(1080px,100%);
@@ -1815,9 +1855,9 @@ if st.session_state.generated_4x2_bytes:
             )
         except Exception as e:
             st.error(f"打包失敗：{e}")
-    st.caption("V11｜STEP 02C-1 FIX3｜主題跟隨＋白天亮度優化＋自有 API 隱碼保護。")
+    st.caption("")
 st.divider()
-st.caption("V11｜STEP 02C-1｜自有 API Session＋隱碼保護")
+st.caption("")
 
 
 # ─────────────────────────────────────────────
