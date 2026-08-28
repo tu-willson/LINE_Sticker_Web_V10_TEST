@@ -2016,6 +2016,24 @@ if st.session_state.generated_4x2_bytes:
         out.alpha_composite(im,((size[0]-nw)//2,(size[1]-nh)//2))
         return out
 
+
+    # ============================================================
+    # V12｜STEP 01A②｜作品名稱
+    # 放在最後打包按鈕正上方
+    # ============================================================
+    st.markdown("### 🏷️ 作品名稱")
+    st.caption("此名稱會同時用於「我的作品」紀錄與 ZIP 下載檔案名稱。")
+    st.text_input(
+        "為這組作品命名",
+        key="v12_project_name_input",
+        placeholder="例如：阿土的日常貼圖",
+        max_chars=80,
+        on_change=_v12_project_name_on_change,
+    )
+    _v12_name_preview = _v12_project_snapshot().get("project_name", "")
+    if not _v12_name_preview:
+        st.caption(f"未填寫時，會自動使用：{_v12_default_project_name()}")
+
     if st.button("📦 完成裁切＋製作貼圖檔案＋一鍵打包", type="primary", use_container_width=True):
         try:
             _sheet = Image.open(BytesIO(st.session_state.generated_4x2_bytes)).convert("RGBA")
@@ -2047,7 +2065,7 @@ if st.session_state.generated_4x2_bytes:
             st.download_button(
                 "⬇️ 下載完整 LINE 套件 ZIP",
                 data=_zipbuf.getvalue(),
-                file_name="LINE_Sticker_01-08_MAIN_TAB.zip",
+                file_name=f"{_v12_safe_download_stem(_v12_project_snapshot().get('project_name'))}.zip",
                 mime="application/zip",
                 use_container_width=True,
                 key="step11b1_download"
@@ -2169,22 +2187,6 @@ def _public02a_settings_panel():
     c1, c2 = st.columns(2)
     with c1:
         # ============================================================
-        # V12｜STEP 01A②｜作品名稱
-        # ============================================================
-        st.markdown("---")
-        st.markdown("### 🏷️ 作品名稱")
-        st.caption("此名稱會同時用於「我的作品」紀錄與 ZIP 下載檔案名稱。")
-        st.text_input(
-            "為這組作品命名",
-            key="v12_project_name_input",
-            placeholder="例如：阿土的日常貼圖",
-            max_chars=80,
-            on_change=_v12_project_name_on_change,
-        )
-        _v12_name_preview = _v12_project_snapshot().get("project_name", "")
-        if not _v12_name_preview:
-            st.caption(f"未填寫時，會自動使用：{_v12_default_project_name()}")
-
         st.download_button(
             "📤 匯出我的設定",
             data=export_data,
