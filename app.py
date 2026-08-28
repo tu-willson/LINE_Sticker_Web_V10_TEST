@@ -210,130 +210,6 @@ def _save_v10_presets():
 
 import streamlit.components.v1 as components
 
-
-# ============================================================
-# V11 STEP 02B-3B｜柔和奶油／蜜桃公開版介面
-# 僅調整視覺，不改變 AI、Supabase、Session 或生成邏輯。
-# ============================================================
-st.markdown(
-    """
-    <style>
-    /* 整體背景：暖白＋淡奶油 */
-    .stApp {
-        background:
-            radial-gradient(circle at 15% 8%, rgba(247, 218, 198, 0.32), transparent 28%),
-            radial-gradient(circle at 90% 18%, rgba(251, 232, 214, 0.38), transparent 30%),
-            linear-gradient(180deg, #fffaf5 0%, #fff7f0 48%, #fffaf6 100%);
-    }
-
-    /* 主要內容寬度與閱讀感 */
-    .main .block-container {
-        max-width: 1180px;
-        padding-top: 2rem;
-        padding-bottom: 3rem;
-    }
-
-    /* 全站文字 */
-    .stApp, .stApp p, .stApp label, .stApp div,
-    .stApp span, .stApp textarea, .stApp input {
-        font-family: "Noto Sans TC", "Microsoft JhengHei", sans-serif;
-    }
-
-    /* 標題與一般文字 */
-    h1, h2, h3 {
-        color: #4d4039 !important;
-        letter-spacing: 0.02em;
-    }
-
-    p, label, .stCaption {
-        color: #6f625b;
-    }
-
-    /* 區塊／卡片感 */
-    div[data-testid="stVerticalBlockBorderWrapper"] {
-        border-color: rgba(226, 190, 165, 0.42) !important;
-        background: rgba(255, 252, 248, 0.76);
-        border-radius: 20px;
-    }
-
-    /* 輸入框 */
-    .stTextInput input,
-    .stTextArea textarea,
-    .stNumberInput input,
-    .stSelectbox [data-baseweb="select"] > div {
-        background: rgba(255, 255, 255, 0.86) !important;
-        border-color: #ead8ca !important;
-        border-radius: 12px !important;
-        color: #51463f !important;
-    }
-
-    .stTextInput input:focus,
-    .stTextArea textarea:focus {
-        border-color: #e6a080 !important;
-        box-shadow: 0 0 0 1px rgba(230, 160, 128, 0.22) !important;
-    }
-
-    /* Radio / checkbox */
-    div[role="radiogroup"] label,
-    div[data-testid="stCheckbox"] label {
-        color: #5c4f48 !important;
-    }
-
-    /* 主要按鈕：柔和蜜桃 */
-    .stButton > button {
-        background: linear-gradient(180deg, #efb08f 0%, #e7a07c 100%) !important;
-        color: #fffdfb !important;
-        border: 1px solid #e3a07f !important;
-        border-radius: 14px !important;
-        box-shadow: 0 7px 18px rgba(207, 139, 106, 0.18);
-        font-weight: 700;
-    }
-
-    .stButton > button:hover {
-        background: linear-gradient(180deg, #eaa685 0%, #df956f 100%) !important;
-        border-color: #dc956f !important;
-    }
-
-    /* Info / success / warning / error 柔化 */
-    div[data-testid="stAlert"] {
-        border-radius: 14px !important;
-        border-width: 1px !important;
-    }
-
-    /* 檔案上傳區 */
-    section[data-testid="stFileUploaderDropzone"] {
-        background: rgba(255, 250, 246, 0.9) !important;
-        border: 1px dashed #e5c7b4 !important;
-        border-radius: 16px !important;
-    }
-
-    /* 分隔線 */
-    hr {
-        border-color: rgba(224, 195, 176, 0.45) !important;
-    }
-
-    /* Metrics */
-    div[data-testid="stMetric"] {
-        background: rgba(255, 252, 248, 0.82);
-        border: 1px solid rgba(226, 194, 175, 0.42);
-        border-radius: 16px;
-        padding: 0.65rem 0.8rem;
-    }
-
-    /* 小提醒文字 */
-    .v11-soft-note {
-        background: rgba(255, 246, 237, 0.82);
-        border: 1px solid rgba(232, 194, 166, 0.45);
-        border-radius: 13px;
-        padding: 0.7rem 0.9rem;
-        color: #75645a;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
-
-
 # ============================================================
 # V10 STEP 10C
 # 原生 HTML Canvas 滑鼠裁切版
@@ -1695,7 +1571,7 @@ if st.session_state.generated_4x2_bytes:
             )
         except Exception as e:
             st.error(f"打包失敗：{e}")
-    st.caption("V11｜STEP 02B-3B｜柔和奶油／蜜桃介面＋自有 API 隱碼保護。")
+    st.caption("V11｜STEP 02B-3B｜AI 生成方式介面整理＋自有 API 隱碼保護。")
 st.divider()
 st.caption("V11｜STEP 02B-3A｜自有 API Session＋隱碼保護")
 
