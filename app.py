@@ -1,4 +1,4 @@
-# V11｜STEP 02C-4④｜等待進度提示＋180 秒逾時保護
+# V11｜STEP 02D-1｜首次使用流程與 UX 整理
 import re
 import zipfile
 import streamlit as st
@@ -292,6 +292,49 @@ st.markdown("""
   max-width:1180px !important;
   padding-left:2rem !important;
   padding-right:2rem !important;
+}
+
+/* V11｜02D-1｜首次使用導引 */
+.v11-onboarding{
+  width:min(1080px,100%);
+  margin:0 auto 1.2rem;
+  padding:1rem 1.15rem 1.1rem;
+  border-radius:18px;
+  border:1px solid rgba(120,120,120,.18);
+  background:linear-gradient(135deg,
+    color-mix(in srgb,#7c5cff 10%, transparent),
+    color-mix(in srgb,#4bb3fd 8%, transparent),
+    color-mix(in srgb,#31c48d 7%, transparent));
+}
+.v11-onboarding-title{
+  text-align:center;
+  font-size:clamp(1.2rem,2.3vw,1.7rem);
+  font-weight:900;
+  margin:.1rem 0 .8rem;
+}
+.v11-onboarding-grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:.75rem;
+}
+.v11-onboarding-card{
+  padding:.8rem .9rem;
+  border-radius:14px;
+  background:color-mix(in srgb,#ffffff 62%, transparent);
+  border:1px solid rgba(120,120,120,.12);
+}
+.v11-onboarding-step{
+  font-size:1.05rem;
+  font-weight:900;
+  margin-bottom:.25rem;
+}
+.v11-onboarding-text{
+  font-size:.98rem;
+  line-height:1.55;
+  opacity:.9;
+}
+@media (max-width:720px){
+  .v11-onboarding-grid{grid-template-columns:1fr;}
 }
 .v10-main-title{
   text-align:center;
@@ -775,10 +818,31 @@ st.markdown("""<style>
 </style>""",unsafe_allow_html=True)
 
 st.markdown('<div class="v10-main-title">🎨 LINE 貼圖創作工作室</div>', unsafe_allow_html=True)
-st.caption("V11 STEP 02C-1｜柔和 Light / Dark 主題最佳化｜使用者自有 OpenAI API Session 安全架構")
+st.caption("V11｜公開版｜快速完成 LINE 貼圖創作")
+st.markdown("""
+<div class="v11-onboarding">
+  <div class="v11-onboarding-title">✨ 第一次使用？照著 3 個步驟就可以開始</div>
+  <div class="v11-onboarding-grid">
+    <div class="v11-onboarding-card">
+      <div class="v11-onboarding-step">① 上傳照片＋設定貼圖</div>
+      <div class="v11-onboarding-text">依序選擇風格、人物特色、貼圖文字、字型與背景。</div>
+    </div>
+    <div class="v11-onboarding-card">
+      <div class="v11-onboarding-step">② 選擇 AI 生成方式</div>
+      <div class="v11-onboarding-text">可使用網站免費額度，或輸入自己的 OpenAI API Key。</div>
+    </div>
+    <div class="v11-onboarding-card">
+      <div class="v11-onboarding-step">③ 生成 → 裁切 → 下載</div>
+      <div class="v11-onboarding-text">生成八格總圖後，再調整裁切範圍並完成下載。</div>
+    </div>
+  </div>
+</div>
+""", unsafe_allow_html=True)
+st.info("💡 小提醒：第一次使用只要依照畫面上的 ①～⑧ 順序往下設定即可，不需要先閱讀複雜說明。")
 st.divider()
 
 v10_section("📷 ① 上傳人物照片", "#ff5c7a")
+st.caption("📌 先上傳一張清楚的人物照片，後續所有貼圖都會以這張照片作為主要參考。")
 uploaded = st.file_uploader("選擇人物照片", type=["jpg","jpeg","png","webp"])
 if uploaded:
     try:
@@ -1303,6 +1367,7 @@ with st.expander("🔍 點選查看貼圖設定"):
 # 5. 預設隱碼；可由使用者自行切換顯示。
 # ============================================================
 v10_section("🤖 ⑦ AI 生成方式", "#6366f1")
+st.caption("📌 選擇一種方式即可：使用網站免費額度，或使用自己的 OpenAI API。")
 
 _api_mode = st.radio(
     "請選擇生成方式",
@@ -1355,6 +1420,7 @@ else:
         st.warning("⚠️ 請先輸入自己的 OpenAI API Key。")
 
 v10_section("✨ ⑧ 生成 4×2 原始總圖", "#e67e22")
+st.caption("📌 確認上方設定後按一次生成；生成期間按鈕會自動鎖定，請耐心等待。")
 
 # ============================================================
 # V11｜STEP 02C-2｜兩階段生成鎖定（正式版）
