@@ -982,9 +982,29 @@ def _v12_project_snapshot():
     project["transparent_background"] = bool(
         st.session_state.get("transparent_png_option", False)
     )
-    project["style_name"] = str(
+    # V12｜STEP 01A③ FIX：
+    # 若使用「⭐ 自定義風格」，作品庫不要只顯示泛稱，
+    # 而是記錄使用者實際選取的「已儲存風格名稱」。
+    _style_mode = str(
         st.session_state.get("v10_style_mode", project.get("style_name", ""))
     )
+    if _style_mode == "⭐ 自定義風格":
+        _saved_style_choice = str(
+            st.session_state.get("v10_saved_custom_style_choice", "")
+        ).strip()
+
+        if _saved_style_choice and _saved_style_choice != "✏️ 尚未選擇／新增":
+            # 下拉選單格式為「01｜暖芽測試」，
+            # 作品紀錄只保存真正的自定義風格名稱「暖芽測試」。
+            if "｜" in _saved_style_choice:
+                project["style_name"] = _saved_style_choice.split("｜", 1)[1].strip()
+            else:
+                project["style_name"] = _saved_style_choice
+        else:
+            project["style_name"] = _style_mode
+    else:
+        project["style_name"] = _style_mode
+
     project["text_style"] = str(
         st.session_state.get("v8_text_style", project.get("text_style", ""))
     )
