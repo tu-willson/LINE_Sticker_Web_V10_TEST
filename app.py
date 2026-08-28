@@ -458,66 +458,6 @@ html[data-theme="dark"] div[data-testid="stCheckbox"] label{
     padding-right:.75rem !important;
   }
 }
-
-/* ------------------------------------------------------------
-   02C-1 FIX2｜Streamlit 內建 Light / Dark 選單最終覆蓋
-   針對 [data-theme="dark"] 可能位於 html / body / app container
-   的情況，避免「文字變白、背景仍是白色」的半反色狀態。
-   ------------------------------------------------------------ */
-
-/* DARK：只要頁面樹上存在 data-theme="dark"，就啟用 */
-[data-theme="dark"] [data-testid="stAppViewContainer"],
-[data-theme="dark"] [data-testid="stAppViewContainer"] > .main,
-[data-theme="dark"] [data-testid="stHeader"],
-[data-theme="dark"] [data-testid="stMain"]{
-  background-color:#17191d !important;
-}
-
-[data-theme="dark"] [data-testid="stAppViewContainer"] .main .block-container{
-  background-color:transparent !important;
-}
-
-[data-theme="dark"] [data-testid="stAppViewContainer"] p,
-[data-theme="dark"] [data-testid="stAppViewContainer"] label,
-[data-theme="dark"] [data-testid="stAppViewContainer"] span,
-[data-theme="dark"] [data-testid="stAppViewContainer"] small,
-[data-theme="dark"] [data-testid="stAppViewContainer"] .stCaption{
-  color:#f0f0f0 !important;
-}
-
-/* Dark cards / expanders / upload areas */
-[data-theme="dark"] div[data-testid="stExpander"],
-[data-theme="dark"] div[data-testid="stFileUploader"] section,
-[data-theme="dark"] div[data-testid="stVerticalBlockBorderWrapper"]{
-  background-color:#1c1f24 !important;
-  border-color:#3a3f47 !important;
-}
-
-/* Dark inputs */
-[data-theme="dark"] div[data-testid="stTextInput"] input,
-[data-theme="dark"] div[data-testid="stTextArea"] textarea,
-[data-theme="dark"] div[data-testid="stNumberInput"] input,
-[data-theme="dark"] div[data-testid="stSelectbox"] [data-baseweb="select"] > div,
-[data-theme="dark"] div[data-testid="stMultiSelect"] [data-baseweb="select"] > div{
-  background-color:#202329 !important;
-  color:#f0f0f0 !important;
-  border-color:#3a3f47 !important;
-}
-
-/* Dark uploader text */
-[data-theme="dark"] div[data-testid="stFileUploader"] *,
-[data-theme="dark"] div[data-testid="stExpander"] *,
-[data-theme="dark"] div[data-testid="stVerticalBlockBorderWrapper"] *{
-  color:#f0f0f0 !important;
-}
-
-/* Avoid forcing primary buttons to the neutral dark style */
-[data-theme="dark"] div[data-testid="stButton"] > button:not([kind="primary"]){
-  background-color:#202329 !important;
-  color:#f0f0f0 !important;
-  border-color:#3a3f47 !important;
-}
-
 </style>
 """, unsafe_allow_html=True)
 
@@ -1853,7 +1793,7 @@ if st.session_state.generated_4x2_bytes:
             )
         except Exception as e:
             st.error(f"打包失敗：{e}")
-    st.caption("V11｜STEP 02C-1 FIX2｜白天／深色模式亮度修正＋自有 API 隱碼保護。")
+    st.caption("V11｜STEP 02C-1 FIX3｜主題跟隨＋白天亮度優化＋自有 API 隱碼保護。")
 st.divider()
 st.caption("V11｜STEP 02C-1｜自有 API Session＋隱碼保護")
 
@@ -1897,6 +1837,138 @@ div[data-testid="stLinkButton"] > a:hover {
 }
 </style>
 """, unsafe_allow_html=True)
+
+# ============================================================
+# V11｜STEP 02C-1 FIX3
+# Theme-variable based UI:
+# 不猜測 Streamlit 的 data-theme DOM 屬性，直接使用 Streamlit
+# 在 System / Light / Dark 切換時會更新的主題 CSS 變數。
+# ============================================================
+st.markdown("""
+<style>
+/*
+  Streamlit theme variables:
+  --background-color
+  --secondary-background-color
+  --text-color
+  --primary-color
+
+  這一層放在所有舊 CSS 之後，避免舊版 hard-coded 白底覆蓋。
+*/
+
+/* 整個 App：背景跟著 Streamlit 主題 */
+html, body,
+[data-testid="stAppViewContainer"],
+[data-testid="stAppViewContainer"] > .main,
+[data-testid="stMain"],
+[data-testid="stHeader"]{
+  background-color:var(--background-color) !important;
+}
+
+/* Light：在 Streamlit 白底上加入很淡的暖灰感；
+   Dark：同一公式會以 dark 的 --background-color 為基準，不會變白。 */
+[data-testid="stAppViewContainer"],
+[data-testid="stMain"]{
+  background-color:color-mix(
+    in srgb,
+    var(--background-color) 92%,
+    #e8e2dc 8%
+  ) !important;
+}
+
+/* 內容容器透明，讓 App 背景統一 */
+[data-testid="stAppViewContainer"] .main .block-container{
+  background:transparent !important;
+}
+
+/* 主要文字完全跟隨 Streamlit 主題 */
+[data-testid="stAppViewContainer"] p,
+[data-testid="stAppViewContainer"] label,
+[data-testid="stAppViewContainer"] span,
+[data-testid="stAppViewContainer"] small,
+[data-testid="stAppViewContainer"] .stCaption,
+[data-testid="stAppViewContainer"] [data-testid="stMarkdownContainer"]{
+  color:var(--text-color) !important;
+}
+
+/* 次要文字 */
+[data-testid="stAppViewContainer"] .stCaption,
+[data-testid="stAppViewContainer"] small{
+  opacity:.82;
+}
+
+/* 卡片／Expander／上傳區：使用 Streamlit 的次背景 */
+div[data-testid="stExpander"],
+div[data-testid="stFileUploader"] section,
+div[data-testid="stVerticalBlockBorderWrapper"],
+.v10-soft-box{
+  background-color:var(--secondary-background-color) !important;
+  border-color:color-mix(in srgb,var(--text-color) 18%, transparent) !important;
+}
+
+/* 輸入控制項：主題自動切換 */
+div[data-testid="stTextInput"] input,
+div[data-testid="stTextArea"] textarea,
+div[data-testid="stNumberInput"] input,
+div[data-testid="stSelectbox"] [data-baseweb="select"] > div,
+div[data-testid="stMultiSelect"] [data-baseweb="select"] > div{
+  background-color:var(--secondary-background-color) !important;
+  color:var(--text-color) !important;
+  border-color:color-mix(in srgb,var(--text-color) 18%, transparent) !important;
+}
+
+/* 上傳器內的文字與圖示跟隨主題 */
+div[data-testid="stFileUploader"] *,
+div[data-testid="stExpander"] *{
+  color:var(--text-color);
+}
+
+/* 一般按鈕跟隨主題；primary 保留原本主色 */
+div[data-testid="stButton"] > button:not([kind="primary"]){
+  background-color:var(--secondary-background-color) !important;
+  color:var(--text-color) !important;
+  border-color:color-mix(in srgb,var(--text-color) 18%, transparent) !important;
+}
+
+/* 原有 V10 自製 HTML 區塊也跟隨主題 */
+.help{
+  background:var(--secondary-background-color) !important;
+  color:var(--text-color) !important;
+}
+
+.help *,
+.v10-soft-box *,
+.v10-section-title,
+.v10-subsection,
+.v10-note{
+  color:var(--text-color);
+}
+
+/* Rainbow section 的彩色漸層保留，但透明度降低，避免 Dark 過亮 */
+.v10-section{
+  background:linear-gradient(
+    180deg,
+    color-mix(in srgb,var(--accent) 9%, transparent),
+    transparent
+  ) !important;
+}
+
+/* 原生 Canvas 區塊仍維持自己的功能色，不動生成邏輯 */
+.viewer{
+  background:var(--secondary-background-color);
+  border-color:color-mix(in srgb,var(--text-color) 35%, transparent);
+}
+
+/* 手機 */
+@media (max-width:800px){
+  [data-testid="stAppViewContainer"] .main .block-container{
+    padding-left:.75rem !important;
+    padding-right:.75rem !important;
+  }
+}
+</style>
+""", unsafe_allow_html=True)
+
 
 st.markdown('<div style="height: 20px;"></div>', unsafe_allow_html=True)
 _link_col = st.columns([1, 2, 1])[1]
