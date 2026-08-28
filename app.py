@@ -1,4 +1,4 @@
-# V11｜STEP 02D-2｜生成後流程與下載 UX 整理
+# V11｜STEP 02D-3｜公開版最後操作細節整理
 import re
 import zipfile
 import streamlit as st
@@ -295,6 +295,28 @@ st.markdown("""
 }
 
 
+
+/* V11｜02D-3｜公開版最後操作細節整理 */
+.v11-section-tip{
+  width:min(900px,100%);
+  margin:.35rem auto .85rem;
+  padding:.6rem .85rem;
+  border-radius:12px;
+  border:1px solid rgba(120,120,120,.14);
+  background:color-mix(in srgb,#64748b 7%, transparent);
+  font-size:.96rem;
+  line-height:1.55;
+}
+.v11-success-next{
+  width:min(900px,100%);
+  margin:.8rem auto 1rem;
+  padding:.8rem 1rem;
+  border-radius:14px;
+  border:1px solid rgba(22,160,133,.25);
+  background:color-mix(in srgb,#16a085 9%, transparent);
+  text-align:center;
+  font-weight:800;
+}
 /* V11｜02D-2｜生成後流程導引 */
 .v11-postgen-guide{
   width:min(1080px,100%);
@@ -878,7 +900,7 @@ st.markdown("""
   </div>
 </div>
 """, unsafe_allow_html=True)
-st.info("💡 小提醒：第一次使用只要依照畫面上的 ①～⑧ 順序往下設定即可，不需要先閱讀複雜說明。")
+st.markdown('<div class="v11-section-tip">💡 <b>小提醒：</b>第一次使用只要依照畫面上的 ①～⑧ 順序往下設定即可，不需要先閱讀複雜說明。</div>', unsafe_allow_html=True)
 st.divider()
 
 v10_section("📷 ① 上傳人物照片", "#ff5c7a")
@@ -1460,7 +1482,7 @@ else:
         st.warning("⚠️ 請先輸入自己的 OpenAI API Key。")
 
 v10_section("✨ ⑧ 生成 4×2 原始總圖", "#e67e22")
-st.caption("📌 確認上方設定後按一次生成；生成期間按鈕會自動鎖定，請耐心等待。")
+st.markdown('<div class="v11-section-tip">📌 <b>準備完成後：</b>按一次生成即可。生成期間按鈕會自動鎖定，請耐心等待。</div>', unsafe_allow_html=True)
 
 # ============================================================
 # V11｜STEP 02C-2｜兩階段生成鎖定（正式版）
@@ -1817,7 +1839,7 @@ if st.session_state.generated_4x2_bytes:
         out.alpha_composite(im,((size[0]-nw)//2,(size[1]-nh)//2))
         return out
 
-    if st.button("📦 完成裁切＋製作 MAIN / TAB＋一鍵打包", type="primary", use_container_width=True):
+    if st.button("📦 完成裁切＋製作貼圖檔案＋一鍵打包", type="primary", use_container_width=True):
         try:
             _sheet = Image.open(BytesIO(st.session_state.generated_4x2_bytes)).convert("RGBA")
             _zipbuf = BytesIO()
