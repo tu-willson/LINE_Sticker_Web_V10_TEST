@@ -103,9 +103,12 @@ def _public02a_apply_settings(data):
 
 
 def _public02a_init():
-    # V12 FIX4：非 Widget 的個人設定 store。
-    # 公開版不能直接把所有訪客資料寫進共用 v10_data，
-    # 因此同一位使用者的 Session 以 public02a_user_presets 作為可靠來源。
+    # V12 FIX8｜先備份「本次 rerun 尚存在的 Widget 值」。
+    #
+    # Streamlit 會在某個 Widget 本次沒有被 render 時，
+    # 於該次 script run 結束後清除它的 session_state key。
+    # 因此切換「開始製作 → 我的作品」時，必須在清除前，
+    # 先把仍存在的自定義風格內容同步到非 Widget store。
     st.session_state.setdefault(
         "public02a_user_presets",
         {
@@ -114,6 +117,37 @@ def _public02a_init():
             "character_custom": ["", "", ""],
             "character_enabled": [False, False, False],
         },
+    )
+
+    _carry = _public02a_normalize_settings(
+        st.session_state.get("public02a_user_presets")
+    )
+
+    for _i in range(1, 11):
+        _name_key = f"v10_style_name_{_i}"
+        _style_key = f"v10_style_custom_{_i}"
+
+        # 只有 key 仍存在時才覆寫 durable store。
+        # 這一刻正是跨頁前最後一次安全擷取的機會。
+        if _name_key in st.session_state:
+            _carry["style_custom_names"][_i - 1] = (
+                str(st.session_state[_name_key]).strip()
+                or f"使用者自定{_i}"
+            )
+
+        if _style_key in st.session_state:
+            _carry["style_custom"][_i - 1] = str(
+                st.session_state[_style_key]
+            ).strip()
+
+    st.session_state["public02a_user_presets"] = {
+        "style_custom": list(_carry["style_custom"]),
+        "style_custom_names": list(_carry["style_custom_names"]),
+        "character_custom": list(_carry["character_custom"]),
+        "character_enabled": list(_carry["character_enabled"]),
+    }
+    st.session_state["public02a_last_preset_snapshot"] = _public02a_normalize_settings(
+        st.session_state["public02a_user_presets"]
     )
 
     defaults = _public02a_normalize_settings(
@@ -139,7 +173,7 @@ def _public02a_init():
             st.session_state[f"v10_character_enabled_{i}"] = pending["character_enabled"][i - 1]
         st.session_state["public02a_custom_phrases"] = list(pending["custom_phrases"])
 
-    # V12 FIX5｜關鍵修正：
+    # V12 FIX8｜回到創作頁時的 Widget 還原：
     # Streamlit 切到「我的作品」後，創作頁的 widget key 可能被移除，
     # 但 public02a_initialized 仍然是 True。
     # FIX4 之前因此不會再次執行 setdefault，造成回到創作頁時風格變空白。
