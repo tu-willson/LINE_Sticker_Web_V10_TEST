@@ -120,37 +120,6 @@ def _public02a_init():
         st.session_state.get("public02a_user_presets")
     )
 
-    # V12 FIX9｜自定義風格內容使用獨立的非 Widget mirror。
-    # 不再只依賴巢狀 public02a_user_presets 或 v10_style_* Widget key。
-    # 每一格都有自己的 session key，跨「開始製作／我的作品」時以 mirror 為準。
-    _mirror_changed = False
-    for _i in range(1, 11):
-        _nmk = f"public02a_style_name_mirror_{_i}"
-        _smk = f"public02a_style_content_mirror_{_i}"
-        if _nmk not in st.session_state:
-            st.session_state[_nmk] = defaults["style_custom_names"][_i - 1]
-        if _smk not in st.session_state:
-            st.session_state[_smk] = defaults["style_custom"][_i - 1]
-
-        _mirror_name = str(st.session_state.get(_nmk, "")).strip()
-        _mirror_style = str(st.session_state.get(_smk, "")).strip()
-
-        # 只有 mirror 有實際內容時才覆寫，避免空值再次清空既有設定。
-        if _mirror_name and _mirror_name != defaults["style_custom_names"][_i - 1]:
-            defaults["style_custom_names"][_i - 1] = _mirror_name
-            _mirror_changed = True
-        if _mirror_style and _mirror_style != defaults["style_custom"][_i - 1]:
-            defaults["style_custom"][_i - 1] = _mirror_style
-            _mirror_changed = True
-
-    if _mirror_changed:
-        st.session_state["public02a_user_presets"] = {
-            "style_custom": list(defaults["style_custom"]),
-            "style_custom_names": list(defaults["style_custom_names"]),
-            "character_custom": list(defaults["character_custom"]),
-            "character_enabled": list(defaults["character_enabled"]),
-        }
-
     # Apply an imported profile BEFORE the corresponding Streamlit widgets are instantiated.
     pending = st.session_state.pop("public02a_pending_import", None)
     if pending is not None:
@@ -165,8 +134,6 @@ def _public02a_init():
         for i in range(1, 11):
             st.session_state[f"v10_style_custom_{i}"] = pending["style_custom"][i - 1]
             st.session_state[f"v10_style_name_{i}"] = pending["style_custom_names"][i - 1]
-            st.session_state[f"public02a_style_content_mirror_{i}"] = pending["style_custom"][i - 1]
-            st.session_state[f"public02a_style_name_mirror_{i}"] = pending["style_custom_names"][i - 1]
         for i in range(1, 4):
             st.session_state[f"v10_character_custom_{i}"] = pending["character_custom"][i - 1]
             st.session_state[f"v10_character_enabled_{i}"] = pending["character_enabled"][i - 1]
@@ -237,33 +204,33 @@ def _public02a_set_preset_store(data):
 
 
 def _public02a_sync_style_slot(slot: int):
-    """Sync one custom-style editor slot into independent non-widget mirrors."""
+    """FIX10: non-destructive sync.
+
+    A blank conditional Streamlit widget must never erase an already saved
+    custom-style prompt. Only non-empty editor values are allowed to update
+    the durable preset store.
+    """
     try:
         slot = int(slot)
         if not 1 <= slot <= 10:
             return
 
+        current = _public02a_get_preset_store()
         name_key = f"v10_style_name_{slot}"
         style_key = f"v10_style_custom_{slot}"
-        mirror_name_key = f"public02a_style_name_mirror_{slot}"
-        mirror_style_key = f"public02a_style_content_mirror_{slot}"
 
         if name_key in st.session_state:
-            st.session_state[mirror_name_key] = (
-                str(st.session_state[name_key]).strip() or f"使用者自定{slot}"
-            )
-        if style_key in st.session_state:
-            st.session_state[mirror_style_key] = str(
-                st.session_state[style_key]
-            ).strip()
+            name = str(st.session_state[name_key]).strip()
+            if name:
+                current["style_custom_names"][slot - 1] = name
 
-        current = _public02a_get_preset_store()
-        current["style_custom_names"][slot - 1] = st.session_state.get(
-            mirror_name_key, current["style_custom_names"][slot - 1]
-        )
-        current["style_custom"][slot - 1] = st.session_state.get(
-            mirror_style_key, current["style_custom"][slot - 1]
-        )
+        if style_key in st.session_state:
+            style = str(st.session_state[style_key]).strip()
+            # CRITICAL: never let an empty/recreated conditional widget erase
+            # a previously saved custom-style prompt.
+            if style:
+                current["style_custom"][slot - 1] = style
+
         _public02a_set_preset_store(current)
         st.session_state["public02a_last_preset_snapshot"] = _public02a_get_preset_store()
     except Exception:
@@ -277,34 +244,27 @@ def _save_v10_presets():
     try:
         existing = _public02a_get_preset_store()
         snapshot = {
-            # 有 render 的編輯器以目前值為準；key 不存在時保留 durable store。
-            "style_custom": [
-                str(
-                    st.session_state[f"v10_style_custom_{i}"]
-                    if f"v10_style_custom_{i}" in st.session_state
-                    else existing["style_custom"][i - 1]
-                )
-                for i in range(1, 11)
-            ],
-            "style_custom_names": [
-                str(
-                    st.session_state[f"v10_style_name_{i}"]
-                    if f"v10_style_name_{i}" in st.session_state
-                    else existing["style_custom_names"][i - 1]
-                )
-                for i in range(1, 11)
-            ],
+            "style_custom": list(existing["style_custom"]),
+            "style_custom_names": list(existing["style_custom_names"]),
             "character_custom": [str(st.session_state.get(f"v10_character_custom_{i}", "")) for i in range(1, 4)],
             "character_enabled": [bool(st.session_state.get(f"v10_character_enabled_{i}", False)) for i in range(1, 4)],
         }
-        # FIX9：完整保存後，同步寫入每格獨立 mirror。
-        for _i in range(1, 11):
-            st.session_state[f"public02a_style_name_mirror_{_i}"] = (
-                snapshot["style_custom_names"][_i - 1]
-            )
-            st.session_state[f"public02a_style_content_mirror_{_i}"] = (
-                snapshot["style_custom"][_i - 1]
-            )
+
+        # FIX10: merge editor values without allowing blank conditional widgets
+        # to wipe previously saved prompts.
+        for i in range(1, 11):
+            name_key = f"v10_style_name_{i}"
+            style_key = f"v10_style_custom_{i}"
+
+            if name_key in st.session_state:
+                name = str(st.session_state[name_key]).strip()
+                if name:
+                    snapshot["style_custom_names"][i - 1] = name
+
+            if style_key in st.session_state:
+                style = str(st.session_state[style_key]).strip()
+                if style:
+                    snapshot["style_custom"][i - 1] = style
 
         _public02a_set_preset_store(snapshot)
         st.session_state["public02a_last_preset_snapshot"] = _public02a_get_preset_store()
@@ -1449,23 +1409,16 @@ if style_mode=="⭐ 自定義風格":
                 st.text_input(
                     f"名稱 {_i:02d}",
                     key=f"v10_style_name_{_i}",
-                    on_change=_public02a_sync_style_slot,
-                    args=(_i,),
                 )
             with _b:
                 st.text_area(
                     f"自定義風格 {_i:02d}",
                     key=f"v10_style_custom_{_i}",
                     height=65,
-                    on_change=_public02a_sync_style_slot,
-                    args=(_i,),
                 )
 
         if st.button("💾 儲存 10 組自定風格",key="v10_save_styles",use_container_width=True):
-            # FIX7：先逐格同步至 durable store，再做完整快照保存。
-            for _sync_i in range(1, 11):
-                _public02a_sync_style_slot(_sync_i)
-
+            # FIX10：採用非破壞式合併保存，空白 Widget 不得覆蓋既有 Prompt。
             if _save_v10_presets():
                 st.success("✅ 10 組自定風格已儲存")
                 st.rerun()
