@@ -342,33 +342,47 @@ def _load_v10_presets():
 
 def _save_v10_presets():
     try:
-        # FIX11: first synchronize the dedicated style bank.
+        # FIX11B｜先把仍存在的 Widget 合併進 Style Bank。
         _public02a_sync_style_bank_from_widgets()
+
+        # Style Bank 是風格資料的唯一權威來源。
+        # 每次儲存時，必須反向完整寫回 legacy/combined store，
+        # 否則 Style Bank 若因部署／Session 重建而重新初始化，
+        # 就會從舊的「使用者自定1 + 空 Prompt」資料重新播種。
+        bank = _public02a_get_style_bank()
         existing = _public02a_get_preset_store()
+
         snapshot = {
-            "style_custom": list(existing["style_custom"]),
-            "style_custom_names": list(existing["style_custom_names"]),
-            "character_custom": [str(st.session_state.get(f"v10_character_custom_{i}", "")) for i in range(1, 4)],
-            "character_enabled": [bool(st.session_state.get(f"v10_character_enabled_{i}", False)) for i in range(1, 4)],
+            "style_custom": [
+                str(bank[str(i)]["prompt"])
+                for i in range(1, 11)
+            ],
+            "style_custom_names": [
+                str(bank[str(i)]["name"])
+                for i in range(1, 11)
+            ],
+            "character_custom": [
+                str(st.session_state.get(f"v10_character_custom_{i}", ""))
+                for i in range(1, 4)
+            ],
+            "character_enabled": [
+                bool(st.session_state.get(f"v10_character_enabled_{i}", False))
+                for i in range(1, 4)
+            ],
         }
 
-        # FIX10: merge editor values without allowing blank conditional widgets
-        # to wipe previously saved prompts.
-        for i in range(1, 11):
-            name_key = f"v10_style_name_{i}"
-            style_key = f"v10_style_custom_{i}"
-
-            if name_key in st.session_state:
-                name = str(st.session_state[name_key]).strip()
-                if name:
-                    snapshot["style_custom_names"][i - 1] = name
-
-            if style_key in st.session_state:
-                style = str(st.session_state[style_key]).strip()
-                if style:
-                    snapshot["style_custom"][i - 1] = style
-
         _public02a_set_preset_store(snapshot)
+
+        # 再把兩個資料來源同步成同一份資料，避免下一次初始化
+        # 從 combined store 取得舊的預設值。
+        _public02a_set_style_bank({
+            str(i): {
+                "name": snapshot["style_custom_names"][i - 1],
+                "prompt": snapshot["style_custom"][i - 1],
+            }
+            for i in range(1, 11)
+        })
+
         st.session_state["public02a_last_preset_snapshot"] = _public02a_get_preset_store()
         return True
     except Exception:
