@@ -730,10 +730,60 @@ div[data-testid="stCheckbox"] label{
   margin-left:auto !important;
   margin-right:auto !important;
 }
+
 .v10-centered-image{
   display:flex;
   justify-content:center;
+  width:100%;
 }
+.v10-centered-image img{
+  margin-left:auto !important;
+  margin-right:auto !important;
+}
+.v12-back-to-top{
+  position:fixed;
+  right:22px;
+  bottom:22px;
+  z-index:9999;
+  width:52px;
+  height:52px;
+  border-radius:50%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  text-decoration:none !important;
+  font-size:26px;
+  font-weight:900;
+  color:#fff !important;
+  background:#ff4f67;
+  border:2px solid rgba(255,255,255,.78);
+  box-shadow:0 8px 24px rgba(0,0,0,.35);
+  transition:transform .18s ease, opacity .18s ease;
+}
+.v12-back-to-top:hover{
+  transform:translateY(-3px) scale(1.05);
+  color:#fff !important;
+}
+.v12-font-gallery-note{
+  text-align:center;
+  opacity:.9;
+  margin:.4rem 0 .7rem;
+}
+.v12-settings-label{
+  font-size:1.05rem;
+  font-weight:800;
+  margin:0 0 .55rem;
+}
+@media (max-width:800px){
+  .v12-back-to-top{
+    width:46px;
+    height:46px;
+    right:14px;
+    bottom:14px;
+    font-size:23px;
+  }
+}
+
 div[data-testid="stFileUploader"],
 div[data-testid="stSelectbox"],
 div[data-testid="stMultiSelect"],
@@ -775,6 +825,8 @@ div[data-testid="stExpander"]{
 }
 </style>
 """, unsafe_allow_html=True)
+
+st.markdown('<a class="v12-back-to-top" href="#v12-page-top" title="快速回到頁面頂端" aria-label="快速回到頁面頂端">⬆️</a>', unsafe_allow_html=True)
 
 def v10_section(title, accent="#7c4dff"):
     st.markdown(
@@ -1580,6 +1632,7 @@ if st.session_state["v12_view"] == "library":
     st.stop()
 
 
+st.markdown('<div id="v12-page-top"></div>', unsafe_allow_html=True)
 st.markdown('<div class="v10-main-title">🎨 LINE 貼圖創作工作室</div>', unsafe_allow_html=True)
 st.caption("V11｜公開版｜快速完成 LINE 貼圖創作")
 st.markdown("""
@@ -1909,14 +1962,38 @@ if st.session_state.pop("v10_scroll_to_font_result", False):
     )
     _v10_font_scroll(key="font_scroll_once")
 
-# 125 種帶圖字型總覽
-# 選中後「整個區塊不再渲染」，因此會真正收起，而不是只抖動。
+# 125 種帶圖字型｜快速選擇＋分頁圖卡總覽
+# 手機不再一次渲染 125 張大圖，降低滑動成本。
 # ------------------------------------------------------------
+_font_labels = [
+    f"{_i:03d}｜{V8_TEXT_EFFECT_CATALOG[_i]}"
+    for _i in range(1, 126)
+]
+
+if "v12_font_quick_pick" not in st.session_state:
+    st.session_state["v12_font_quick_pick"] = "— 快速選擇字型 —"
+
+_quick_font_choice = st.selectbox(
+    "⚡ 快速選擇 125 種字型",
+    ["— 快速選擇字型 —"] + _font_labels,
+    key="v12_font_quick_pick",
+)
+
+if _quick_font_choice != "— 快速選擇字型 —":
+    _quick_font_no = int(_quick_font_choice.split("｜", 1)[0])
+    if st.session_state.get("v8_selected_font") != _quick_font_no:
+        st.session_state["v8_selected_font"] = _quick_font_no
+        st.session_state["v10_font_gallery_open"] = False
+        st.session_state["v10_scroll_to_font_result"] = True
+        st.rerun()
+
 if "v10_font_gallery_open" not in st.session_state:
     st.session_state.v10_font_gallery_open = False
+if "v12_font_gallery_page" not in st.session_state:
+    st.session_state.v12_font_gallery_page = 1
 
 if st.button(
-    "📚 125 種帶圖字型總覽" if not st.session_state.v10_font_gallery_open
+    "📚 開啟 125 種帶圖字型總覽" if not st.session_state.v10_font_gallery_open
     else "📖 關閉 125 種帶圖字型總覽",
     key="v10_font_gallery_toggle",
     use_container_width=True,
@@ -1925,30 +2002,66 @@ if st.button(
     st.rerun()
 
 if st.session_state.v10_font_gallery_open:
-    st.caption("🖱️ 點選字型後會立即關閉總覽，並回到目前選擇結果。")
+    st.markdown(
+        '<div class="v12-font-gallery-note">📱 手機版已改為分頁瀏覽，每頁 12 種；點選後會立即關閉總覽並回到已選結果。</div>',
+        unsafe_allow_html=True,
+    )
 
-    _font_cols = st.columns(5)
-    for _i in range(1, 126):
+    _font_per_page = 12
+    _font_total_pages = (125 + _font_per_page - 1) // _font_per_page
+    _page_options = list(range(1, _font_total_pages + 1))
+
+    _current_page = st.selectbox(
+        "📄 瀏覽頁數",
+        _page_options,
+        index=max(0, min(st.session_state.v12_font_gallery_page, _font_total_pages) - 1),
+        key="v12_font_gallery_page_select",
+    )
+    st.session_state.v12_font_gallery_page = _current_page
+
+    _start_no = (_current_page - 1) * _font_per_page + 1
+    _end_no = min(125, _start_no + _font_per_page - 1)
+    st.caption(f"目前顯示 {_start_no:03d}～{_end_no:03d} ／ 125")
+
+    # 桌機 4 欄、手機由 Streamlit 自動縮排；一次只顯示 12 張。
+    _font_cols = st.columns(4)
+    for _i in range(_start_no, _end_no + 1):
         _p = V8_FONT_PREVIEW_DIR / f"{_i:03d}.jpg"
         if not _p.exists():
             continue
 
-        with _font_cols[(_i - 1) % 5]:
+        with _font_cols[(_i - _start_no) % 4]:
             st.image(str(_p), use_container_width=True)
             st.caption(f"{_i:03d}｜{V8_TEXT_EFFECT_CATALOG[_i]}")
-
             if st.button(
                 f"選用 {_i:03d}",
                 key=f"font_pick_{_i}",
                 use_container_width=True,
             ):
-                st.session_state.v8_selected_font = _i
-                st.session_state.v10_scroll_to_font_result = True
-
-                # 核心：下一次 rerun 時完全不渲染 125 總覽。
-                st.session_state.v10_font_gallery_open = False
-
+                st.session_state["v8_selected_font"] = _i
+                st.session_state["v12_font_quick_pick"] = (
+                    f"{_i:03d}｜{V8_TEXT_EFFECT_CATALOG[_i]}"
+                )
+                st.session_state["v10_scroll_to_font_result"] = True
+                st.session_state["v10_font_gallery_open"] = False
                 st.rerun()
+
+    _prev_col, _page_col, _next_col = st.columns([1, 1.2, 1])
+    with _prev_col:
+        if st.button("⬅️ 上一頁", key="v12_font_prev", use_container_width=True, disabled=_current_page <= 1):
+            st.session_state.v12_font_gallery_page = _current_page - 1
+            st.session_state["v12_font_gallery_page_select"] = _current_page - 1
+            st.rerun()
+    with _page_col:
+        st.markdown(
+            f'<div style="text-align:center;padding:.55rem 0;font-weight:800;">第 {_current_page} / {_font_total_pages} 頁</div>',
+            unsafe_allow_html=True,
+        )
+    with _next_col:
+        if st.button("下一頁 ➡️", key="v12_font_next", use_container_width=True, disabled=_current_page >= _font_total_pages):
+            st.session_state.v12_font_gallery_page = _current_page + 1
+            st.session_state["v12_font_gallery_page_select"] = _current_page + 1
+            st.rerun()
 
 
 with st.expander("🔎 已選字型大圖", expanded=False):
@@ -2463,13 +2576,13 @@ if st.session_state.generated_4x2_bytes:
     # 固定預覽寬度，避免隨網頁容器無限放大。
     # --------------------------------------------------------
     v10_subsection("🖼️ 原始 4×2 圖片", "#e74c3c")
-    st.markdown('<div class="v10-centered-image">', unsafe_allow_html=True)
-    st.image(
-    st.session_state.generated_4x2_bytes,
-    caption=f"原始生成圖：{w} × {h} px",
-    width=900,
-    )
-    st.markdown("</div>", unsafe_allow_html=True)
+    _orig_left, _orig_center, _orig_right = st.columns([1, 5, 1])
+    with _orig_center:
+        st.image(
+            st.session_state.generated_4x2_bytes,
+            caption=f"原始生成圖：{w} × {h} px",
+            use_container_width=True,
+        )
 
     st.caption(
         "上方是原始圖片預覽；下方 Canvas 才是可直接拖曳的裁切操作區。"
@@ -2796,11 +2909,11 @@ def _public02a_settings_panel():
         indent=2,
     ).encode("utf-8")
 
-    c1, c2 = st.columns(2)
+    c1, c2 = st.columns(2, vertical_alignment="top")
     with c1:
-        # ============================================================
+        st.markdown('<div class="v12-settings-label">📤 匯出我的設定</div>', unsafe_allow_html=True)
         st.download_button(
-            "📤 匯出我的設定",
+            "📤 匯出設定 JSON",
             data=export_data,
             file_name="LINE貼圖工具_我的設定.json",
             mime="application/json",
@@ -2809,11 +2922,13 @@ def _public02a_settings_panel():
         )
 
     with c2:
+        st.markdown('<div class="v12-settings-label">📥 匯入我的設定</div>', unsafe_allow_html=True)
         imported = st.file_uploader(
-            "📥 匯入我的設定",
+            "選擇設定 JSON",
             type=["json"],
             key="public02a_import_settings",
             help="選擇之前匯出的 LINE貼圖工具_我的設定.json",
+            label_visibility="collapsed",
         )
         if imported is not None:
             try:
