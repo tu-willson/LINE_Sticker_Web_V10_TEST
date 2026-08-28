@@ -1,4 +1,4 @@
-# V11｜STEP 02C-4②｜等待進度提示＋180 秒逾時保護
+# V11｜STEP 02C-4③｜等待進度提示＋180 秒逾時保護
 import re
 import zipfile
 import streamlit as st
@@ -211,6 +211,32 @@ def _save_v10_presets():
 # 舊版 v10_data/ 仍保留在專案中，作為備份資料，不由公開版讀寫。
 
 import streamlit.components.v1 as components
+
+
+def _v11_user_error_message(exc: Exception) -> str:
+    """Return a simple Chinese message for end users; never expose traceback."""
+    msg = str(exc or "").lower()
+
+    if isinstance(exc, TimeoutError) or "timeout" in msg or "timed out" in msg:
+        return "⏱️ 生成逾時，請重新操作。"
+
+    if "api key" in msg or "authentication" in msg or "unauthorized" in msg or "401" in msg:
+        return "🔑 API Key 無法使用，請確認後重新操作。"
+
+    if "429" in msg or "rate limit" in msg or "quota" in msg:
+        return "⚠️ AI 服務目前較忙，請稍後再試。"
+
+    if "no api key" in msg or "api key" in msg:
+        return "🔑 請先確認 API Key，再重新操作。"
+
+    if "b64_json" in msg or "沒有取得有效圖片" in msg or "圖片資料不完整" in msg:
+        return "🖼️ 這次沒有取得有效圖片，請重新操作。"
+
+    if "image" in msg or "png" in msg or "pil" in msg or "base64" in msg:
+        return "🖼️ 圖片處理失敗，請重新操作。"
+
+    return "🔴 圖片生成失敗，請稍後重新操作。"
+
 
 # ============================================================
 # V10 STEP 10C
@@ -1461,7 +1487,7 @@ if st.session_state.get("v11_generation_pending", False):
                 output_format="png",
             )
 
-                # V11｜02C-4②｜異常回應資料防護
+                # V11｜02C-4③｜異常回應資料防護
                 # API 呼叫成功不代表一定取得有效圖片；空 data / 缺少 b64_json
                 # 必須視為生成失敗，交回原本的 exception / refund 流程。
                 if not getattr(result, "data", None):
