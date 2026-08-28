@@ -1011,8 +1011,14 @@ def _v12_now_iso():
     return datetime.now().astimezone().isoformat(timespec="seconds")
 
 def _v12_new_project_metadata():
+    """V12｜01B①：建立目前作品的標準化 metadata。
+
+    保留既有 flat keys，確保目前 UI / 打包流程完全相容；
+    同時新增 canonical nested schema，供後續搜尋、篩選、排序與持久化使用。
+    """
     now = _v12_now_iso()
     return {
+        # ---- Backward-compatible flat fields (existing UI reads these) ----
         "project_id": str(uuid4()),
         "project_name": "",
         "style_name": "",
@@ -1020,7 +1026,6 @@ def _v12_new_project_metadata():
         "text_style": "",
         "created_at": now,
         "updated_at": now,
-        # 後續 STEP 01A②～⑤ 逐步填入；本階段不永久保存。
         "generation_method": "",
         "transparent_background": False,
         "sticker_texts": [""] * 8,
@@ -1029,18 +1034,110 @@ def _v12_new_project_metadata():
         "stickers": [],
         "main_image": None,
         "tab_image": None,
+
+        # ---- V12｜STEP 01B① canonical metadata ----
+        "schema_version": "v12.project.1",
+        "identity": {
+            "project_id": "",
+            "project_name": "",
+        },
+        "timestamps": {
+            "created_at": now,
+            "updated_at": now,
+        },
+        "creative_settings": {
+            "style": {"name": ""},
+            "font": {"name": ""},
+            "text_style": "",
+            "generation_method": "",
+            "transparent_background": False,
+            "sticker_texts": [""] * 8,
+        },
+        "package_settings": {
+            "main_no": "",
+            "tab_no": "",
+            "sticker_count": 8,
+        },
     }
+
+
+def _v12_normalize_project_metadata(metadata):
+    """Return canonical metadata while preserving all legacy flat fields.
+
+    This is intentionally non-destructive: old history records can be opened
+    without migration, while new records always receive the standard schema.
+    """
+    base = _v12_new_project_metadata()
+    data = dict(metadata or {})
+
+    # Identity / timestamps: canonical values may be supplied by newer records,
+    # otherwise fall back to the existing flat structure.
+    identity = data.get("identity") if isinstance(data.get("identity"), dict) else {}
+    timestamps = data.get("timestamps") if isinstance(data.get("timestamps"), dict) else {}
+    creative = data.get("creative_settings") if isinstance(data.get("creative_settings"), dict) else {}
+    package = data.get("package_settings") if isinstance(data.get("package_settings"), dict) else {}
+
+    style = creative.get("style") if isinstance(creative.get("style"), dict) else {}
+    font = creative.get("font") if isinstance(creative.get("font"), dict) else {}
+
+    project_id = str(data.get("project_id") or identity.get("project_id") or base["project_id"])
+    project_name = _v12_normalize_project_name(
+        data.get("project_name", identity.get("project_name", ""))
+    )
+    created_at = str(data.get("created_at") or timestamps.get("created_at") or base["created_at"])
+    updated_at = str(data.get("updated_at") or timestamps.get("updated_at") or created_at)
+
+    sticker_texts = data.get("sticker_texts", creative.get("sticker_texts", [""] * 8))
+    if not isinstance(sticker_texts, list):
+        sticker_texts = list(sticker_texts or [])
+    sticker_texts = [str(x) for x in sticker_texts[:8]]
+    sticker_texts += [""] * (8 - len(sticker_texts))
+
+    normalized = dict(data)
+    normalized.update({
+        "project_id": project_id,
+        "project_name": project_name,
+        "created_at": created_at,
+        "updated_at": updated_at,
+        "style_name": str(data.get("style_name", style.get("name", "")) or ""),
+        "font_name": str(data.get("font_name", font.get("name", "")) or ""),
+        "text_style": str(data.get("text_style", creative.get("text_style", "")) or ""),
+        "generation_method": str(data.get("generation_method", creative.get("generation_method", "")) or ""),
+        "transparent_background": bool(data.get("transparent_background", creative.get("transparent_background", False))),
+        "sticker_texts": sticker_texts,
+        "schema_version": "v12.project.1",
+    })
+
+    normalized["identity"] = {
+        "project_id": normalized["project_id"],
+        "project_name": normalized["project_name"],
+    }
+    normalized["timestamps"] = {
+        "created_at": normalized["created_at"],
+        "updated_at": normalized["updated_at"],
+    }
+    normalized["creative_settings"] = {
+        "style": {"name": normalized["style_name"]},
+        "font": {"name": normalized["font_name"]},
+        "text_style": normalized["text_style"],
+        "generation_method": normalized["generation_method"],
+        "transparent_background": normalized["transparent_background"],
+        "sticker_texts": list(normalized["sticker_texts"]),
+    }
+    normalized["package_settings"] = {
+        "main_no": str(data.get("main_no", package.get("main_no", "")) or ""),
+        "tab_no": str(data.get("tab_no", package.get("tab_no", "")) or ""),
+        "sticker_count": int(package.get("sticker_count", 8) or 8),
+    }
+    return normalized
+
 
 st.session_state.setdefault("v12_current_project", _v12_new_project_metadata())
 st.session_state.setdefault("v12_projects_local_index", [])
 
 # ============================================================
 # V12｜STEP 01A③｜作品暫存與歷史紀錄
-# 本階段採用「目前瀏覽器 Session 暫存」：
-# - 不寫入 AI 每日額度資料
-# - 不保存 API Key
-# - 可在本次瀏覽期間查看、重新下載、載回作品
-# - 後續可再擴充為真正的瀏覽器永久保存 / 雲端保存
+# V12｜STEP 01B①｜資料結構標準化
 # ============================================================
 V12_HISTORY_LIMIT = 12
 
@@ -1049,35 +1146,57 @@ def _v12_png_bytes(image):
     image.convert("RGBA").save(buf, "PNG", optimize=True)
     return buf.getvalue()
 
+
+def _v12_build_assets_manifest(grid_bytes=None, main_bytes=None, tab_bytes=None,
+                               sticker_bytes=None, zip_bytes=None):
+    """Store lightweight asset descriptors only; binary data stays in legacy fields."""
+    sticker_bytes = dict(sticker_bytes or {})
+    return {
+        "grid": {"present": bool(grid_bytes), "bytes": len(grid_bytes or b"")},
+        "stickers": {
+            "count": len(sticker_bytes),
+            "numbers": sorted(str(k) for k in sticker_bytes.keys()),
+            "total_bytes": sum(len(v or b"") for v in sticker_bytes.values()),
+        },
+        "main": {"present": bool(main_bytes), "bytes": len(main_bytes or b"")},
+        "tab": {"present": bool(tab_bytes), "bytes": len(tab_bytes or b"")},
+        "zip": {"present": bool(zip_bytes), "bytes": len(zip_bytes or b"")},
+    }
+
+
 def _v12_history_record(metadata, zip_bytes, grid_bytes=None,
                         main_bytes=None, tab_bytes=None,
                         sticker_bytes=None, main_no=None, tab_no=None):
-    metadata = dict(metadata or {})
+    metadata = _v12_normalize_project_metadata(metadata)
     project_id = str(metadata.get("project_id") or uuid4())
     now = _v12_now_iso()
 
-    record = {
-        "project_id": project_id,
-        "project_name": (
-            _v12_normalize_project_name(metadata.get("project_name"))
-            or _v12_default_project_name()
-        ),
-        "created_at": metadata.get("created_at") or now,
-        "updated_at": now,
-        "style_name": str(metadata.get("style_name") or ""),
-        "font_name": str(metadata.get("font_name") or ""),
-        "text_style": str(metadata.get("text_style") or ""),
-        "generation_method": str(metadata.get("generation_method") or ""),
-        "transparent_background": bool(metadata.get("transparent_background", False)),
-        "sticker_texts": list(metadata.get("sticker_texts") or [""] * 8)[:8],
-        "main_no": str(main_no or ""),
-        "tab_no": str(tab_no or ""),
+    metadata["project_id"] = project_id
+    metadata["updated_at"] = now
+    metadata["package_settings"] = {
+        "main_no": str(main_no or metadata.get("package_settings", {}).get("main_no", "")),
+        "tab_no": str(tab_no or metadata.get("package_settings", {}).get("tab_no", "")),
+        "sticker_count": 8,
+    }
+    metadata = _v12_normalize_project_metadata(metadata)
+
+    record = dict(metadata)
+    record.update({
+        "main_no": metadata["package_settings"]["main_no"],
+        "tab_no": metadata["package_settings"]["tab_no"],
         "zip_bytes": bytes(zip_bytes or b""),
         "grid_bytes": bytes(grid_bytes or b""),
         "main_bytes": bytes(main_bytes or b""),
         "tab_bytes": bytes(tab_bytes or b""),
         "sticker_bytes": dict(sticker_bytes or {}),
-    }
+    })
+    record["assets_manifest"] = _v12_build_assets_manifest(
+        grid_bytes=record["grid_bytes"],
+        main_bytes=record["main_bytes"],
+        tab_bytes=record["tab_bytes"],
+        sticker_bytes=record["sticker_bytes"],
+        zip_bytes=record["zip_bytes"],
+    )
 
     projects = list(st.session_state.get("v12_projects_local_index", []))
     projects = [p for p in projects if str(p.get("project_id")) != project_id]
@@ -1085,33 +1204,31 @@ def _v12_history_record(metadata, zip_bytes, grid_bytes=None,
     st.session_state["v12_projects_local_index"] = projects[:V12_HISTORY_LIMIT]
 
     project = _v12_current_project()
-    project.update({
-        "project_id": project_id,
-        "project_name": record["project_name"],
-        "updated_at": now,
-    })
+    project.update(_v12_normalize_project_metadata(metadata))
     st.session_state["v12_current_project"] = project
     return record
 
+
 def _v12_load_history_record(record):
-    metadata = _v12_new_project_metadata()
-    for key in (
-        "project_id", "project_name", "created_at", "updated_at",
-        "style_name", "font_name", "text_style", "generation_method",
-        "transparent_background", "sticker_texts"
-    ):
-        if key in record:
-            metadata[key] = record[key]
+    record = dict(record or {})
+    metadata = _v12_normalize_project_metadata(record)
 
     st.session_state["v12_current_project"] = metadata
     st.session_state["v12_project_name_input"] = metadata.get("project_name", "")
     st.session_state["generated_4x2_bytes"] = record.get("grid_bytes") or None
-    st.session_state["v12_loaded_history_main_no"] = record.get("main_no", "")
-    st.session_state["v12_loaded_history_tab_no"] = record.get("tab_no", "")
+
+    package = metadata.get("package_settings", {})
+    st.session_state["v12_loaded_history_main_no"] = str(
+        record.get("main_no") or package.get("main_no") or ""
+    )
+    st.session_state["v12_loaded_history_tab_no"] = str(
+        record.get("tab_no") or package.get("tab_no") or ""
+    )
 
     texts = list(metadata.get("sticker_texts") or [""] * 8)
     for i in range(8):
         st.session_state[f"sticker_text_{i}"] = str(texts[i] if i < len(texts) else "")
+
 
 def _v12_delete_history_record(project_id):
     projects = list(st.session_state.get("v12_projects_local_index", []))
@@ -1119,13 +1236,14 @@ def _v12_delete_history_record(project_id):
         p for p in projects if str(p.get("project_id")) != str(project_id)
     ]
 
+
 def _v12_current_project():
     project = st.session_state.get("v12_current_project")
     if not isinstance(project, dict):
         project = _v12_new_project_metadata()
-        st.session_state["v12_current_project"] = project
+    project = _v12_normalize_project_metadata(project)
+    st.session_state["v12_current_project"] = project
     return project
-
 
 def _v12_default_project_name():
     return datetime.now().strftime("LINE貼圖_%Y%m%d_%H%M")
@@ -1170,7 +1288,10 @@ def _v12_project_snapshot():
     )
     if _style_mode == "⭐ 自定義風格":
         _saved_style_choice = str(
-            st.session_state.get("v10_saved_custom_style_choice", "")
+            st.session_state.get(
+                "v12_saved_custom_style_choice",
+                st.session_state.get("v10_saved_custom_style_choice", ""),
+            )
         ).strip()
 
         if _saved_style_choice and _saved_style_choice != "✏️ 尚未選擇／新增":
