@@ -1253,81 +1253,6 @@ v10_section("✨ ⑧ 生成 4×2 原始總圖", "#e67e22")
 st.session_state.setdefault("v11_generation_in_progress", False)
 _generation_locked = bool(st.session_state.get("v11_generation_in_progress", False))
 
-
-# ============================================================
-# V11 STEP 02C-2 FIX1｜瀏覽器即時防連點
-#
-# Streamlit 的 st.button 在「本次 rerun」中一旦被點擊，
-# Python 會進入長時間的 AI 呼叫；此時 Python 還沒有機會
-# 重新繪製按鈕，所以單靠 disabled=_generation_locked 不夠。
-#
-# 這段只負責 UI 層：偵測這顆按鈕被點擊後立即 disabled，
-# 並把文字改成「生成中」。真正的後端鎖仍保留在
-# st.session_state + Supabase quota。
-# ============================================================
-st.markdown("""
-<script>
-(function () {
-  const TARGET = "✨ 生成 4×2 八格總圖";
-  const LOCKED = "🔄 AI 正在生成，請稍候……";
-  const INSTALL_KEY = "__v11_02c2_fix1_installed__";
-
-  if (window[INSTALL_KEY]) return;
-  window[INSTALL_KEY] = true;
-
-  function findTargetButton() {
-    const buttons = document.querySelectorAll(
-      'div[data-testid="stButton"] button'
-    );
-    for (const btn of buttons) {
-      const txt = (btn.innerText || btn.textContent || "").trim();
-      if (txt === TARGET || txt === LOCKED) return btn;
-    }
-    return null;
-  }
-
-  function lockButton(btn) {
-    if (!btn || btn.disabled) return;
-    btn.disabled = true;
-    btn.setAttribute("aria-disabled", "true");
-    btn.dataset.v11Generating = "true";
-    btn.innerText = LOCKED;
-    btn.style.cursor = "wait";
-    btn.style.opacity = "0.72";
-  }
-
-  // Capture phase：在 Streamlit 處理 click 的同一個事件循環中立即鎖定。
-  document.addEventListener("click", function (event) {
-    const btn = event.target.closest(
-      'div[data-testid="stButton"] button'
-    );
-    if (!btn) return;
-
-    const txt = (btn.innerText || btn.textContent || "").trim();
-    if (txt === TARGET && !btn.disabled) {
-      lockButton(btn);
-    }
-  }, true);
-
-  // Streamlit rerun 會重建 DOM；若 session lock 已經存在，
-  // 也再次把按鈕保持在 locked 狀態。
-  const observer = new MutationObserver(function () {
-    const btn = findTargetButton();
-    if (btn && btn.dataset.v11Generating === "true") {
-      lockButton(btn);
-    }
-  });
-
-  observer.observe(document.body, {childList: true, subtree: true});
-
-  const first = findTargetButton();
-  if (first && first.dataset.v11Generating === "true") {
-    lockButton(first);
-  }
-})();
-</script>
-""", unsafe_allow_html=True)
-
 if st.button(
     "🔄 AI 正在生成，請稍候……" if _generation_locked else "✨ 生成 4×2 八格總圖",
     type="primary",
@@ -1677,7 +1602,7 @@ if st.session_state.generated_4x2_bytes:
             st.error(f"打包失敗：{e}")
     st.caption("V11｜STEP 02C-1 FIX3｜主題跟隨＋白天亮度優化＋自有 API 隱碼保護。")
 st.divider()
-st.caption("V11｜STEP 02C-2 FIX1｜自有 API Session＋隱碼保護")
+st.caption("V11｜STEP 02C-1｜自有 API Session＋隱碼保護")
 
 
 # ─────────────────────────────────────────────
