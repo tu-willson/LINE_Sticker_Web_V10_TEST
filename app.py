@@ -3072,16 +3072,29 @@ def _public02a_settings_panel():
             margin:.85rem 0 .55rem;
         }
 
+        /* 兩個元件先固定為完全相同的外框寬度，再讓內部元件撐滿 */
         div.st-key-public02a_export_settings,
         div.st-key-public02a_import_settings{
             width:min(560px, 100%) !important;
+            max-width:560px !important;
             margin-left:auto !important;
             margin-right:auto !important;
+        }
+
+        div.st-key-public02a_export_settings,
+        div.st-key-public02a_import_settings,
+        div.st-key-public02a_import_settings [data-testid="stFileUploader"],
+        div.st-key-public02a_import_settings [data-testid="stFileUploaderDropzone"],
+        div.st-key-public02a_import_settings [data-testid="stFileUploaderDropzone"] > div{
+            width:100% !important;
+            max-width:100% !important;
+            box-sizing:border-box !important;
         }
 
         div.st-key-public02a_export_settings button,
         div.st-key-public02a_import_settings button{
             width:100% !important;
+            min-width:100% !important;
             min-height:3.35rem !important;
             box-sizing:border-box !important;
             display:flex !important;
@@ -3164,6 +3177,7 @@ def _public02a_settings_panel():
         key="public02a_import_settings",
         help="選擇之前匯出的 LINE貼圖工具_自定義設定.json",
         label_visibility="collapsed",
+        width="stretch",
     )
 
     if imported is not None:
