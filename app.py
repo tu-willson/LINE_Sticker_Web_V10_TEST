@@ -2108,71 +2108,36 @@ if st.session_state.v10_font_gallery_open:
     # 圖卡改由 HTML/CSS Grid 顯示；選擇動作集中到下方數字輸入，
     # 讓手機使用者可以「快速瀏覽 → 輸入編號 → 立即選用」。
     # --------------------------------------------------------
-    _font_cards_html = ['<div class="v12-font-grid">']
+    # --------------------------------------------------------
+    # V12｜STEP 01B③-2
+    # 可直接點選的原生 Streamlit 字型圖卡。
+    # 圖片維持原生 st.image，編號就是選取按鈕。
+    # --------------------------------------------------------
+    _font_cols = st.columns(4)
 
     for _i in range(_start_no, _end_no + 1):
         _p = V8_FONT_PREVIEW_DIR / f"{_i:03d}.jpg"
         if not _p.exists():
             continue
 
-        try:
-            _img_b64 = base64.b64encode(_p.read_bytes()).decode("ascii")
-            _font_name = html.escape(str(V8_TEXT_EFFECT_CATALOG[_i]))
-            _font_cards_html.append(
-                f"""
-                <div class="v12-font-card">
-                    <img src="data:image/jpeg;base64,{_img_b64}"
-                         alt="{_i:03d}｜{_font_name}" loading="lazy">
-                    <div class="v12-font-card-meta">
-                        <span class="v12-font-card-no">{_i:03d}</span>
-                        <span class="v12-font-card-name">{_font_name}</span>
-                    </div>
-                </div>
-                """
-            )
-        except Exception:
-            # 單一預覽圖異常時，不中斷整個字型總覽。
-            continue
+        with _font_cols[(_i - _start_no) % 4]:
+            st.image(str(_p), use_container_width=True)
 
-    _font_cards_html.append("</div>")
+            # 直接點選編號即可選取該字型。
+            if st.button(
+                f"{_i:03d}",
+                key=f"font_card_pick_{_i}",
+                use_container_width=True,
+            ):
+                st.session_state["v8_selected_font"] = _i
+                st.session_state["v12_font_quick_pick"] = (
+                    f"{_i:03d}｜{V8_TEXT_EFFECT_CATALOG[_i]}"
+                )
+                st.session_state["v10_scroll_to_font_result"] = True
+                st.session_state["v10_font_gallery_open"] = False
+                st.rerun()
 
-    # 使用 st.html() 直接輸出圖卡 HTML，避免 st.markdown 的 HTML 清理器
-    # 在部分 Streamlit Cloud / 行動版環境把 data:image/base64 圖片來源過濾掉，
-    # 導致「圖卡框架存在，但圖片全部看不到」的問題。
-    _font_cards_render = "".join(_font_cards_html)
-    if hasattr(st, "html"):
-        st.html(_font_cards_render)
-    else:
-        # 舊版 Streamlit 的相容備援。
-        st.markdown(_font_cards_render, unsafe_allow_html=True)
-
-    _pick_col, _apply_col = st.columns([2.2, 1])
-    with _pick_col:
-        _gallery_pick = st.number_input(
-            "🎯 輸入要選用的字型編號",
-            min_value=_start_no,
-            max_value=_end_no,
-            value=_start_no,
-            step=1,
-            key=f"v12_font_gallery_pick_page_{_current_page}",
-        )
-    with _apply_col:
-        st.markdown("<div style='height:1.85rem'></div>", unsafe_allow_html=True)
-        _apply_font_pick = st.button(
-            f"選用 {_gallery_pick:03d}",
-            key=f"v12_font_gallery_apply_page_{_current_page}",
-            use_container_width=True,
-        )
-
-    if _apply_font_pick:
-        _picked_font = int(_gallery_pick)
-        st.session_state["v8_selected_font"] = _picked_font
-        st.session_state["v12_font_quick_pick"] = (
-            f"{_picked_font:03d}｜{V8_TEXT_EFFECT_CATALOG[_picked_font]}"
-        )
-        st.session_state["v10_scroll_to_font_result"] = True
-        st.session_state["v10_font_gallery_open"] = False
-        st.rerun()
+            st.caption(V8_TEXT_EFFECT_CATALOG[_i])
 
     # callback 會在 Streamlit 下一次完整執行前更新頁數，
     # 不會在 widget 已實例化後直接修改其 key。
