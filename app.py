@@ -1971,15 +1971,15 @@ _font_labels = [
 ]
 
 if "v12_font_quick_pick" not in st.session_state:
-    st.session_state["v12_font_quick_pick"] = "— 快速選擇字型 —"
+    st.session_state["v12_font_quick_pick"] = "— 快速選擇字型｜可直接輸入數字 —"
 
 _quick_font_choice = st.selectbox(
     "⚡ 快速選擇 125 種字型",
-    ["— 快速選擇字型 —"] + _font_labels,
+    ["— 快速選擇字型｜可直接輸入數字 —"] + _font_labels,
     key="v12_font_quick_pick",
 )
 
-if _quick_font_choice != "— 快速選擇字型 —":
+if _quick_font_choice != "— 快速選擇字型｜可直接輸入數字 —":
     _quick_font_no = int(_quick_font_choice.split("｜", 1)[0])
     if st.session_state.get("v8_selected_font") != _quick_font_no:
         st.session_state["v8_selected_font"] = _quick_font_no
@@ -2011,10 +2011,14 @@ if st.session_state.v10_font_gallery_open:
     _font_total_pages = (125 + _font_per_page - 1) // _font_per_page
     _page_options = list(range(1, _font_total_pages + 1))
 
+    # 使用單一 Session State key 管理頁數，避免 widget 建立後
+    # 再直接寫入另一個同輪 widget key 而觸發 StreamlitAPIException。
+    if "v12_font_gallery_page_select" not in st.session_state:
+        st.session_state["v12_font_gallery_page_select"] = 1
+
     _current_page = st.selectbox(
         "📄 瀏覽頁數",
         _page_options,
-        index=max(0, min(st.session_state.v12_font_gallery_page, _font_total_pages) - 1),
         key="v12_font_gallery_page_select",
     )
     st.session_state.v12_font_gallery_page = _current_page
@@ -2046,22 +2050,38 @@ if st.session_state.v10_font_gallery_open:
                 st.session_state["v10_font_gallery_open"] = False
                 st.rerun()
 
+    # callback 會在 Streamlit 下一次完整執行前更新頁數，
+    # 不會在 widget 已實例化後直接修改其 key。
+    def _v12_font_change_page(delta):
+        current = int(st.session_state.get("v12_font_gallery_page_select", 1))
+        target = max(1, min(_font_total_pages, current + delta))
+        st.session_state["v12_font_gallery_page_select"] = target
+        st.session_state["v12_font_gallery_page"] = target
+
     _prev_col, _page_col, _next_col = st.columns([1, 1.2, 1])
     with _prev_col:
-        if st.button("⬅️ 上一頁", key="v12_font_prev", use_container_width=True, disabled=_current_page <= 1):
-            st.session_state.v12_font_gallery_page = _current_page - 1
-            st.session_state["v12_font_gallery_page_select"] = _current_page - 1
-            st.rerun()
+        st.button(
+            "⬅️ 上一頁",
+            key="v12_font_prev",
+            use_container_width=True,
+            disabled=_current_page <= 1,
+            on_click=_v12_font_change_page,
+            args=(-1,),
+        )
     with _page_col:
         st.markdown(
             f'<div style="text-align:center;padding:.55rem 0;font-weight:800;">第 {_current_page} / {_font_total_pages} 頁</div>',
             unsafe_allow_html=True,
         )
     with _next_col:
-        if st.button("下一頁 ➡️", key="v12_font_next", use_container_width=True, disabled=_current_page >= _font_total_pages):
-            st.session_state.v12_font_gallery_page = _current_page + 1
-            st.session_state["v12_font_gallery_page_select"] = _current_page + 1
-            st.rerun()
+        st.button(
+            "下一頁 ➡️",
+            key="v12_font_next",
+            use_container_width=True,
+            disabled=_current_page >= _font_total_pages,
+            on_click=_v12_font_change_page,
+            args=(1,),
+        )
 
 
 with st.expander("🔎 已選字型大圖", expanded=False):
@@ -2913,7 +2933,7 @@ def _public02a_settings_panel():
     with c1:
         st.markdown('<div class="v12-settings-label">📤 匯出我的設定</div>', unsafe_allow_html=True)
         st.download_button(
-            "📤 匯出設定 JSON",
+            "匯出設定",
             data=export_data,
             file_name="LINE貼圖工具_我的設定.json",
             mime="application/json",
@@ -2923,12 +2943,64 @@ def _public02a_settings_panel():
 
     with c2:
         st.markdown('<div class="v12-settings-label">📥 匯入我的設定</div>', unsafe_allow_html=True)
+
+        # 將原生 uploader 的英文 Upload / 檔案資訊隱藏，
+        # 改成單純顯示「匯入設定」按鈕。
+        st.markdown("""
+        <style>
+        div[data-testid="stFileUploader"] section {
+            padding: 0 !important;
+            border: none !important;
+            background: transparent !important;
+        }
+        div[data-testid="stFileUploader"] section > div {
+            display: none !important;
+        }
+        div[data-testid="stFileUploader"] button {
+            width: 100% !important;
+            min-height: 2.75rem !important;
+            font-size: 1rem !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
         imported = st.file_uploader(
-            "選擇設定 JSON",
+            "匯入設定",
             type=["json"],
             key="public02a_import_settings",
             help="選擇之前匯出的 LINE貼圖工具_我的設定.json",
             label_visibility="collapsed",
+        )
+
+        st.components.v1.html(
+            """
+            <script>
+            const parentDoc = window.parent.document;
+            const fixImportButton = () => {
+                const uploaders = parentDoc.querySelectorAll('[data-testid="stFileUploader"]');
+                uploaders.forEach((uploader) => {
+                    const btn = uploader.querySelector('button');
+                    if (btn) btn.textContent = '匯入設定';
+
+                    uploader.querySelectorAll('small, span, p').forEach((el) => {
+                        const t = (el.textContent || '').trim();
+                        if (
+                            t.includes('Upload') ||
+                            t.includes('Browse files') ||
+                            t.includes('200MB') ||
+                            t.includes('per file')
+                        ) {
+                            el.style.display = 'none';
+                        }
+                    });
+                });
+            };
+            fixImportButton();
+            setTimeout(fixImportButton, 300);
+            setTimeout(fixImportButton, 1000);
+            </script>
+            """,
+            height=0,
         )
         if imported is not None:
             try:
