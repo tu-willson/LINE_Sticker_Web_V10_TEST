@@ -73,25 +73,86 @@ def _public02a_normalize_settings(data):
 
 
 def _public02a_get_settings():
-    return {
-        "style_custom": [
-            st.session_state.get(f"v10_style_custom_{i}", "")
-            for i in range(1, 11)
-        ],
-        "style_custom_names": [
-            st.session_state.get(f"v10_style_name_{i}", f"使用者自定{i}")
-            for i in range(1, 11)
-        ],
-        "character_custom": [
-            st.session_state.get(f"v10_character_custom_{i}", "")
-            for i in range(1, 4)
-        ],
-        "character_enabled": [
-            bool(st.session_state.get(f"v10_character_enabled_{i}", False))
-            for i in range(1, 4)
-        ],
-        "custom_phrases": list(st.session_state.get("public02a_custom_phrases", [])),
+    """
+    取得目前使用者的完整自定義設定。
+
+    V12 FIX｜匯出空檔案修正
+
+    自定義風格在 V12 已改由 public02a_style_bank 作為唯一可靠來源，
+    因為舊的 v10_style_custom_* widget 會在切換頁面／條件渲染後被
+    Streamlit 移除或重設。
+
+    因此匯出時不能再直接讀 legacy widget keys，
+    必須從 Style Bank 取得真正已儲存的風格資料。
+    """
+
+    # ------------------------------------------------------------
+    # ① 自定義風格：Style Bank 是 V12 的 authoritative source
+    # ------------------------------------------------------------
+    bank = _public02a_get_style_bank()
+
+    style_custom = [
+        str(bank[str(i)].get("prompt", ""))
+        for i in range(1, 11)
+    ]
+
+    style_custom_names = [
+        str(bank[str(i)].get("name", "")).strip() or f"使用者自定{i}"
+        for i in range(1, 11)
+    ]
+
+    # ------------------------------------------------------------
+    # ② 人物／場景：優先讀目前畫面中的 widget，
+    #    若 widget 已被 Streamlit 清除，則回退到 durable preset store
+    # ------------------------------------------------------------
+    preset_store = _public02a_get_preset_store()
+
+    character_custom = []
+    character_enabled = []
+
+    for i in range(1, 4):
+        custom_key = f"v10_character_custom_{i}"
+        enabled_key = f"v10_character_enabled_{i}"
+
+        if custom_key in st.session_state:
+            character_custom.append(
+                str(st.session_state.get(custom_key, ""))
+            )
+        else:
+            character_custom.append(
+                str(preset_store["character_custom"][i - 1])
+            )
+
+        if enabled_key in st.session_state:
+            character_enabled.append(
+                bool(st.session_state.get(enabled_key, False))
+            )
+        else:
+            character_enabled.append(
+                bool(preset_store["character_enabled"][i - 1])
+            )
+
+    # ------------------------------------------------------------
+    # ③ 自定義語詞：使用目前 Session 的專屬語詞池
+    # ------------------------------------------------------------
+    custom_phrases = list(
+        dict.fromkeys(
+            str(x).strip()
+            for x in st.session_state.get("public02a_custom_phrases", [])
+            if str(x).strip()
+        )
+    )
+
+    settings = {
+        "style_custom": style_custom,
+        "style_custom_names": style_custom_names,
+        "character_custom": character_custom,
+        "character_enabled": character_enabled,
+        "custom_phrases": custom_phrases,
     }
+
+    # 最後統一正規化，確保匯出的 JSON 格式固定且可再次匯入。
+    return _public02a_normalize_settings(settings)
 
 
 def _public02a_apply_settings(data):
