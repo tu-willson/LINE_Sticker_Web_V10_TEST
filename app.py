@@ -3115,7 +3115,7 @@ def _public02a_settings_panel():
             data=export_data,
             file_name="LINE貼圖工具_自定義設定.json",
             mime="application/json",
-            use_container_width=True,
+            use_container_width=False,
             key="public02a_export_settings",
         )
 
