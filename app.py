@@ -10,6 +10,7 @@ import random
 from pathlib import Path
 import json
 import hashlib
+import html
 import urllib.request
 import urllib.error
 
