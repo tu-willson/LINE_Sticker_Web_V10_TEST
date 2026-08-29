@@ -3046,31 +3046,35 @@ def _public02a_settings_panel():
         indent=2,
     ).encode("utf-8")
 
+    # 兩欄標題與按鈕維持同一個版面結構，確保桌機與手機都一致。
     c1, c2 = st.columns(2, vertical_alignment="top")
+
     with c1:
-        st.markdown('<div class="v12-settings-label">📤 匯出我的設定</div>', unsafe_allow_html=True)
+        st.markdown('<div class="v12-settings-label">📤 匯出自定義設定</div>', unsafe_allow_html=True)
         st.download_button(
-            "匯出設定",
+            "匯出自定義設定",
             data=export_data,
-            file_name="LINE貼圖工具_我的設定.json",
+            file_name="LINE貼圖工具_自定義設定.json",
             mime="application/json",
             use_container_width=True,
             key="public02a_export_settings",
         )
 
     with c2:
-        st.markdown('<div class="v12-settings-label">📥 匯入我的設定</div>', unsafe_allow_html=True)
+        st.markdown('<div class="v12-settings-label">📥 匯入自定義設定</div>', unsafe_allow_html=True)
 
-        # 將原生 uploader 的英文 Upload / 檔案資訊隱藏，
-        # 改成單純顯示「匯入設定」按鈕。
+        # 保留 Streamlit 原生檔案選擇功能，只隱藏英文說明／容量資訊，
+        # 不再隱藏 section 的所有子元素，避免手機版把「匯入」按鈕一起藏掉。
         st.markdown("""
         <style>
         div[data-testid="stFileUploader"] section {
             padding: 0 !important;
             border: none !important;
             background: transparent !important;
+            min-height: auto !important;
         }
-        div[data-testid="stFileUploader"] section > div {
+        div[data-testid="stFileUploaderDropzoneInstructions"],
+        div[data-testid="stFileUploader"] small {
             display: none !important;
         }
         div[data-testid="stFileUploader"] button {
@@ -3082,13 +3086,15 @@ def _public02a_settings_panel():
         """, unsafe_allow_html=True)
 
         imported = st.file_uploader(
-            "匯入設定",
+            "匯入自定義設定",
             type=["json"],
             key="public02a_import_settings",
-            help="選擇之前匯出的 LINE貼圖工具_我的設定.json",
+            help="選擇之前匯出的 LINE貼圖工具_自定義設定.json",
             label_visibility="collapsed",
         )
 
+        # Streamlit 原生 uploader 沒有直接自訂按鈕文字的參數；
+        # 只改按鈕文字，保留真正的檔案選擇行為。
         st.components.v1.html(
             """
             <script>
@@ -3097,7 +3103,7 @@ def _public02a_settings_panel():
                 const uploaders = parentDoc.querySelectorAll('[data-testid="stFileUploader"]');
                 uploaders.forEach((uploader) => {
                     const btn = uploader.querySelector('button');
-                    if (btn) btn.textContent = '匯入設定';
+                    if (btn) btn.textContent = '匯入自定義設定';
 
                     uploader.querySelectorAll('small, span, p').forEach((el) => {
                         const t = (el.textContent || '').trim();
@@ -3105,7 +3111,8 @@ def _public02a_settings_panel():
                             t.includes('Upload') ||
                             t.includes('Browse files') ||
                             t.includes('200MB') ||
-                            t.includes('per file')
+                            t.includes('per file') ||
+                            t.includes('Drag and drop')
                         ) {
                             el.style.display = 'none';
                         }
@@ -3113,19 +3120,21 @@ def _public02a_settings_panel():
                 });
             };
             fixImportButton();
-            setTimeout(fixImportButton, 300);
-            setTimeout(fixImportButton, 1000);
+            setTimeout(fixImportButton, 200);
+            setTimeout(fixImportButton, 800);
+            setTimeout(fixImportButton, 1500);
             </script>
             """,
             height=0,
         )
+
         if imported is not None:
             try:
                 raw = imported.getvalue()
                 import_hash = hashlib.sha256(raw).hexdigest()
                 last_hash = st.session_state.get("public02a_last_import_hash")
 
-                # Streamlit keeps the uploader value across reruns.  Only process
+                # Streamlit keeps the uploader value across reruns. Only process
                 # a newly selected file; otherwise the same file would call
                 # st.rerun() forever.
                 if import_hash != last_hash:
@@ -3135,7 +3144,7 @@ def _public02a_settings_panel():
                     st.session_state["public02a_import_success"] = True
                     st.rerun()
                 elif st.session_state.get("public02a_import_success"):
-                    st.success("✅ 我的設定已匯入")
+                    st.success("✅ 自定義設定已匯入")
             except Exception as exc:
                 st.error(f"❌ 匯入失敗：{exc}")
 
