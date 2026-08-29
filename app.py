@@ -2015,8 +2015,10 @@ text_style = st.selectbox(
 )
 
 _selected_font = st.session_state.get("v8_selected_font", None)
+# 選完字型後的回跳定位點：刻意放在「125 種帶圖字型」標題之前，
+# 讓回跳後可直接看到「已選擇 125 字型」成功提示，而不是停在提示下方。
+st.markdown('<div id="v10-font-result-anchor" style="scroll-margin-top: 72px;"></div>', unsafe_allow_html=True)
 v10_subsection("🔤 125 種帶圖字型", "#8e67d8")
-st.markdown('<div id="v10-font-result-anchor"></div>', unsafe_allow_html=True)
 if _selected_font:
     st.success(f"🎨 已選擇 125 字型：{_selected_font:03d}｜{V8_TEXT_EFFECT_CATALOG[_selected_font]}")
 else:
@@ -2038,14 +2040,12 @@ if st.session_state.pop("v10_scroll_to_font_result", False):
             if (!anchor) return;
             requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
+                    // 直接定位到「125 種帶圖字型」區塊的上方定位點。
+                    // 這個定位點比成功提示更上面，因此回跳後會保留完整的
+                    // 「已選擇 125 字型：XXX｜名稱」提示在可視範圍內。
                     anchor.scrollIntoView({
                         behavior: "instant",
                         block: "start"
-                    });
-                    // 讓「已選擇 125 字型」成功標語完整留在畫面中，
-                    // 避免錨點剛好貼到最上方而看不出是否選取成功。
-                    requestAnimationFrame(() => {
-                        window.scrollBy({ top: -150, left: 0, behavior: "instant" });
                     });
                 });
             });
