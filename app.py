@@ -2124,18 +2124,23 @@ if st.session_state.v10_font_gallery_open:
             st.image(str(_p), use_container_width=True)
 
             # 直接點選編號即可選取該字型。
-            if st.button(
+            # callback 先在 widget 建立前更新狀態，避免 Streamlit
+            # 禁止在同一次 rerun 中直接修改已建立的 selectbox key。
+            def _v12_pick_font_from_card(font_no=_i):
+                st.session_state["v8_selected_font"] = font_no
+                st.session_state["v10_scroll_to_font_result"] = True
+                st.session_state["v10_font_gallery_open"] = False
+
+                # v12_font_quick_pick 是上方已建立的 widget key。
+                # 不直接寫入它，改由後續初始化／同步邏輯依 v8_selected_font
+                # 自動顯示目前選擇的字型，避免 StreamlitAPIException。
+
+            st.button(
                 f"{_i:03d}",
                 key=f"font_card_pick_{_i}",
                 use_container_width=True,
-            ):
-                st.session_state["v8_selected_font"] = _i
-                st.session_state["v12_font_quick_pick"] = (
-                    f"{_i:03d}｜{V8_TEXT_EFFECT_CATALOG[_i]}"
-                )
-                st.session_state["v10_scroll_to_font_result"] = True
-                st.session_state["v10_font_gallery_open"] = False
-                st.rerun()
+                on_click=_v12_pick_font_from_card,
+            )
 
             st.caption(V8_TEXT_EFFECT_CATALOG[_i])
 
