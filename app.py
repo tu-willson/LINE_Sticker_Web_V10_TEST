@@ -3050,7 +3050,17 @@ def _public02a_settings_panel():
     st.markdown("""
     <style>
     /* 只鎖定「匯入自定義設定」這一個 uploader，避免影響上方的人物照片上傳。 */
-    div.st-key-public02a_import_settings [data-testid="stFileUploaderDropzoneInstructions"] {
+    div.st-key-public02a_import_settings,
+    div.st-key-public02a_import_settings [data-testid="stFileUploader"],
+    div.st-key-public02a_import_settings [data-testid="stFileUploaderDropzone"],
+    div.st-key-public02a_import_settings section {
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    /* 移除原生拖放區外觀與說明，只保留真正的檔案選擇按鈕。 */
+    div.st-key-public02a_import_settings [data-testid="stFileUploaderDropzoneInstructions"],
+    div.st-key-public02a_import_settings small {
         display: none !important;
     }
     div.st-key-public02a_import_settings section {
@@ -3059,22 +3069,30 @@ def _public02a_settings_panel():
         background: transparent !important;
         min-height: auto !important;
     }
+
+    /* 重要：文字直接以正常版面流呈現，不使用 absolute，避免跑到按鈕外面。 */
     div.st-key-public02a_import_settings button {
         width: 100% !important;
         min-height: 3.15rem !important;
-        font-size: 1.05rem !important;
+        box-sizing: border-box !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        position: relative !important;
+        overflow: hidden !important;
+        font-size: 0 !important;
     }
-    /* 隱藏原生英文文字，但保留按鈕本身的點擊行為。 */
-    div.st-key-public02a_import_settings button > div {
-        visibility: hidden !important;
+    div.st-key-public02a_import_settings button * {
+        font-size: 0 !important;
     }
     div.st-key-public02a_import_settings button::after {
         content: "匯入自定義設定";
-        visibility: visible !important;
-        position: absolute;
-        left: 0;
-        right: 0;
-        text-align: center;
+        display: block !important;
+        position: static !important;
+        font-size: 1.05rem !important;
+        line-height: 1.2 !important;
+        white-space: nowrap !important;
+        text-align: center !important;
     }
     @media (max-width: 640px) {
         div.st-key-public02a_import_settings button {
