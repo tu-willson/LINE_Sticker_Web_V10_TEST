@@ -3049,6 +3049,31 @@ def _public02a_settings_panel():
     # 兩欄固定 1:1，標題列與操作列分開，避免左側匯出按鈕視覺上擠壓右側匯入區。
     st.markdown("""
     <style>
+    /* 匯出／匯入按鈕統一尺寸並在各自欄位中央對齊。 */
+    div.st-key-public02a_export_settings,
+    div.st-key-public02a_import_settings {
+        display: flex !important;
+        justify-content: center !important;
+        width: 100% !important;
+    }
+
+    div.st-key-public02a_export_settings button,
+    div.st-key-public02a_import_settings button {
+        width: 16rem !important;
+        max-width: 100% !important;
+        min-height: 3.15rem !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+        box-sizing: border-box !important;
+    }
+
+    @media (max-width: 640px) {
+        div.st-key-public02a_export_settings button,
+        div.st-key-public02a_import_settings button {
+            width: 100% !important;
+        }
+    }
+
     /* 只鎖定「匯入自定義設定」這一個 uploader，避免影響上方的人物照片上傳。 */
     div.st-key-public02a_import_settings,
     div.st-key-public02a_import_settings [data-testid="stFileUploader"],
@@ -3072,7 +3097,8 @@ def _public02a_settings_panel():
 
     /* 重要：文字直接以正常版面流呈現，不使用 absolute，避免跑到按鈕外面。 */
     div.st-key-public02a_import_settings button {
-        width: 100% !important;
+        width: 16rem !important;
+        max-width: 100% !important;
         min-height: 3.15rem !important;
         box-sizing: border-box !important;
         display: flex !important;
@@ -3104,9 +3130,9 @@ def _public02a_settings_panel():
 
     _settings_head_left, _settings_head_right = st.columns([1, 1], gap="small")
     with _settings_head_left:
-        st.markdown('<div class="v12-settings-label">📤 匯出自定義設定</div>', unsafe_allow_html=True)
+        st.markdown('<div class="v12-settings-label" style="text-align:center;">📤 匯出自定義設定</div>', unsafe_allow_html=True)
     with _settings_head_right:
-        st.markdown('<div class="v12-settings-label">📥 匯入自定義設定</div>', unsafe_allow_html=True)
+        st.markdown('<div class="v12-settings-label" style="text-align:center;">📥 匯入自定義設定</div>', unsafe_allow_html=True)
 
     _settings_btn_left, _settings_btn_right = st.columns([1, 1], gap="small")
     with _settings_btn_left:
