@@ -2134,7 +2134,16 @@ if st.session_state.v10_font_gallery_open:
             continue
 
     _font_cards_html.append("</div>")
-    st.markdown("".join(_font_cards_html), unsafe_allow_html=True)
+
+    # 使用 st.html() 直接輸出圖卡 HTML，避免 st.markdown 的 HTML 清理器
+    # 在部分 Streamlit Cloud / 行動版環境把 data:image/base64 圖片來源過濾掉，
+    # 導致「圖卡框架存在，但圖片全部看不到」的問題。
+    _font_cards_render = "".join(_font_cards_html)
+    if hasattr(st, "html"):
+        st.html(_font_cards_render)
+    else:
+        # 舊版 Streamlit 的相容備援。
+        st.markdown(_font_cards_render, unsafe_allow_html=True)
 
     _pick_col, _apply_col = st.columns([2.2, 1])
     with _pick_col:
