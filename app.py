@@ -3062,7 +3062,7 @@ def _public02a_settings_panel():
         """
         <style>
         .v12-settings-stack{
-            width:min(680px, 100%);
+            width:100%;
             margin:0 auto 1.15rem;
         }
         .v12-settings-label{
@@ -3072,13 +3072,12 @@ def _public02a_settings_panel():
             margin:.85rem 0 .55rem;
         }
 
-        /* 兩個元件先固定為完全相同的外框寬度，再讓內部元件撐滿 */
+        /* 兩個元件由相同的中央欄位控制寬度，避免原生元件外框不一致 */
         div.st-key-public02a_export_settings,
         div.st-key-public02a_import_settings{
-            width:min(560px, 100%) !important;
-            max-width:560px !important;
-            margin-left:auto !important;
-            margin-right:auto !important;
+            width:100% !important;
+            max-width:100% !important;
+            margin:0 !important;
         }
 
         div.st-key-public02a_export_settings,
@@ -3154,14 +3153,17 @@ def _public02a_settings_panel():
         unsafe_allow_html=True,
     )
 
-    st.download_button(
-        "匯出自定義設定",
-        data=export_data,
-        file_name="LINE貼圖工具_自定義設定.json",
-        mime="application/json",
-        use_container_width=True,
-        key="public02a_export_settings",
-    )
+    # 使用相同的三欄中央欄位，兩個控制項會取得完全一致的實際寬度。
+    _exp_left, _exp_center, _exp_right = st.columns([1.25, 1, 1.25], gap="small")
+    with _exp_center:
+        st.download_button(
+            "匯出自定義設定",
+            data=export_data,
+            file_name="LINE貼圖工具_自定義設定.json",
+            mime="application/json",
+            use_container_width=True,
+            key="public02a_export_settings",
+        )
     st.markdown('</div>', unsafe_allow_html=True)
 
     # 📥 匯入
@@ -3171,14 +3173,17 @@ def _public02a_settings_panel():
         unsafe_allow_html=True,
     )
 
-    imported = st.file_uploader(
-        "匯入自定義設定",
-        type=["json"],
-        key="public02a_import_settings",
-        help="選擇之前匯出的 LINE貼圖工具_自定義設定.json",
-        label_visibility="collapsed",
-        width="stretch",
-    )
+    # 與匯出使用完全相同的欄位比例，確保兩個按鈕大小一致。
+    _imp_left, _imp_center, _imp_right = st.columns([1.25, 1, 1.25], gap="small")
+    with _imp_center:
+        imported = st.file_uploader(
+            "匯入自定義設定",
+            type=["json"],
+            key="public02a_import_settings",
+            help="選擇之前匯出的 LINE貼圖工具_自定義設定.json",
+            label_visibility="collapsed",
+            width="stretch",
+        )
 
     if imported is not None:
         try:
