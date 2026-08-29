@@ -3046,11 +3046,52 @@ def _public02a_settings_panel():
         indent=2,
     ).encode("utf-8")
 
-    # 兩欄標題與按鈕維持同一個版面結構，確保桌機與手機都一致。
-    c1, c2 = st.columns(2, vertical_alignment="top")
+    # 兩欄固定 1:1，標題列與操作列分開，避免左側匯出按鈕視覺上擠壓右側匯入區。
+    st.markdown("""
+    <style>
+    /* 只鎖定「匯入自定義設定」這一個 uploader，避免影響上方的人物照片上傳。 */
+    div.st-key-public02a_import_settings [data-testid="stFileUploaderDropzoneInstructions"] {
+        display: none !important;
+    }
+    div.st-key-public02a_import_settings section {
+        padding: 0 !important;
+        border: 0 !important;
+        background: transparent !important;
+        min-height: auto !important;
+    }
+    div.st-key-public02a_import_settings button {
+        width: 100% !important;
+        min-height: 3.15rem !important;
+        font-size: 1.05rem !important;
+    }
+    /* 隱藏原生英文文字，但保留按鈕本身的點擊行為。 */
+    div.st-key-public02a_import_settings button > div {
+        visibility: hidden !important;
+    }
+    div.st-key-public02a_import_settings button::after {
+        content: "匯入自定義設定";
+        visibility: visible !important;
+        position: absolute;
+        left: 0;
+        right: 0;
+        text-align: center;
+    }
+    @media (max-width: 640px) {
+        div.st-key-public02a_import_settings button {
+            min-height: 3rem !important;
+        }
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
-    with c1:
+    _settings_head_left, _settings_head_right = st.columns([1, 1], gap="small")
+    with _settings_head_left:
         st.markdown('<div class="v12-settings-label">📤 匯出自定義設定</div>', unsafe_allow_html=True)
+    with _settings_head_right:
+        st.markdown('<div class="v12-settings-label">📥 匯入自定義設定</div>', unsafe_allow_html=True)
+
+    _settings_btn_left, _settings_btn_right = st.columns([1, 1], gap="small")
+    with _settings_btn_left:
         st.download_button(
             "匯出自定義設定",
             data=export_data,
@@ -3060,72 +3101,13 @@ def _public02a_settings_panel():
             key="public02a_export_settings",
         )
 
-    with c2:
-        st.markdown('<div class="v12-settings-label">📥 匯入自定義設定</div>', unsafe_allow_html=True)
-
-        # 保留 Streamlit 原生檔案選擇功能，只隱藏英文說明／容量資訊，
-        # 不再隱藏 section 的所有子元素，避免手機版把「匯入」按鈕一起藏掉。
-        st.markdown("""
-        <style>
-        div[data-testid="stFileUploader"] section {
-            padding: 0 !important;
-            border: none !important;
-            background: transparent !important;
-            min-height: auto !important;
-        }
-        div[data-testid="stFileUploaderDropzoneInstructions"],
-        div[data-testid="stFileUploader"] small {
-            display: none !important;
-        }
-        div[data-testid="stFileUploader"] button {
-            width: 100% !important;
-            min-height: 2.75rem !important;
-            font-size: 1rem !important;
-        }
-        </style>
-        """, unsafe_allow_html=True)
-
+    with _settings_btn_right:
         imported = st.file_uploader(
             "匯入自定義設定",
             type=["json"],
             key="public02a_import_settings",
             help="選擇之前匯出的 LINE貼圖工具_自定義設定.json",
             label_visibility="collapsed",
-        )
-
-        # Streamlit 原生 uploader 沒有直接自訂按鈕文字的參數；
-        # 只改按鈕文字，保留真正的檔案選擇行為。
-        st.components.v1.html(
-            """
-            <script>
-            const parentDoc = window.parent.document;
-            const fixImportButton = () => {
-                const uploaders = parentDoc.querySelectorAll('[data-testid="stFileUploader"]');
-                uploaders.forEach((uploader) => {
-                    const btn = uploader.querySelector('button');
-                    if (btn) btn.textContent = '匯入自定義設定';
-
-                    uploader.querySelectorAll('small, span, p').forEach((el) => {
-                        const t = (el.textContent || '').trim();
-                        if (
-                            t.includes('Upload') ||
-                            t.includes('Browse files') ||
-                            t.includes('200MB') ||
-                            t.includes('per file') ||
-                            t.includes('Drag and drop')
-                        ) {
-                            el.style.display = 'none';
-                        }
-                    });
-                });
-            };
-            fixImportButton();
-            setTimeout(fixImportButton, 200);
-            setTimeout(fixImportButton, 800);
-            setTimeout(fixImportButton, 1500);
-            </script>
-            """,
-            height=0,
         )
 
         if imported is not None:
