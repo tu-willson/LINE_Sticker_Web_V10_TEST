@@ -774,6 +774,76 @@ div[data-testid="stCheckbox"] label{
   font-weight:800;
   margin:0 0 .55rem;
 }
+
+/* V12｜STEP 01B③｜125 種帶圖字型響應式圖卡牆 */
+.v12-font-grid{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:14px;
+  width:100%;
+  margin:.7rem auto 1rem;
+}
+.v12-font-card{
+  min-width:0;
+  overflow:hidden;
+  border:1px solid rgba(122,142,170,.28);
+  border-radius:14px;
+  background:rgba(255,255,255,.025);
+  box-shadow:0 4px 14px rgba(0,0,0,.14);
+}
+.v12-font-card img{
+  display:block;
+  width:100%;
+  aspect-ratio:1 / 1;
+  object-fit:cover;
+  background:#f7f7f7;
+}
+.v12-font-card-meta{
+  display:flex;
+  align-items:center;
+  gap:.45rem;
+  padding:.48rem .58rem .58rem;
+  min-width:0;
+}
+.v12-font-card-no{
+  flex:0 0 auto;
+  font-weight:900;
+  color:#a9c9ff;
+  font-size:.92rem;
+}
+.v12-font-card-name{
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  opacity:.88;
+  font-size:.86rem;
+}
+@media (max-width:1000px){
+  .v12-font-grid{
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:11px;
+  }
+}
+@media (max-width:640px){
+  .v12-font-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:9px;
+    margin:.55rem auto .8rem;
+  }
+  .v12-font-card{
+    border-radius:11px;
+  }
+  .v12-font-card-meta{
+    gap:.35rem;
+    padding:.4rem .45rem .48rem;
+  }
+  .v12-font-card-no{
+    font-size:.82rem;
+  }
+  .v12-font-card-name{
+    font-size:.78rem;
+  }
+}
 @media (max-width:800px){
   .v12-back-to-top{
     width:46px;
@@ -2027,28 +2097,72 @@ if st.session_state.v10_font_gallery_open:
     _end_no = min(125, _start_no + _font_per_page - 1)
     st.caption(f"目前顯示 {_start_no:03d}～{_end_no:03d} ／ 125")
 
-    # 桌機 4 欄、手機由 Streamlit 自動縮排；一次只顯示 12 張。
-    _font_cols = st.columns(4)
+    # --------------------------------------------------------
+    # V12｜STEP 01B③
+    # 響應式字型圖卡牆：
+    # 桌機 4 欄、平板 3 欄、手機固定 2 欄。
+    #
+    # 不再使用 st.columns() 直接承載圖片，避免手機版把 4 欄
+    # 全部垂直堆成超長單欄。
+    # 圖卡改由 HTML/CSS Grid 顯示；選擇動作集中到下方數字輸入，
+    # 讓手機使用者可以「快速瀏覽 → 輸入編號 → 立即選用」。
+    # --------------------------------------------------------
+    _font_cards_html = ['<div class="v12-font-grid">']
+
     for _i in range(_start_no, _end_no + 1):
         _p = V8_FONT_PREVIEW_DIR / f"{_i:03d}.jpg"
         if not _p.exists():
             continue
 
-        with _font_cols[(_i - _start_no) % 4]:
-            st.image(str(_p), use_container_width=True)
-            st.caption(f"{_i:03d}｜{V8_TEXT_EFFECT_CATALOG[_i]}")
-            if st.button(
-                f"選用 {_i:03d}",
-                key=f"font_pick_{_i}",
-                use_container_width=True,
-            ):
-                st.session_state["v8_selected_font"] = _i
-                st.session_state["v12_font_quick_pick"] = (
-                    f"{_i:03d}｜{V8_TEXT_EFFECT_CATALOG[_i]}"
-                )
-                st.session_state["v10_scroll_to_font_result"] = True
-                st.session_state["v10_font_gallery_open"] = False
-                st.rerun()
+        try:
+            _img_b64 = base64.b64encode(_p.read_bytes()).decode("ascii")
+            _font_name = html.escape(str(V8_TEXT_EFFECT_CATALOG[_i]))
+            _font_cards_html.append(
+                f"""
+                <div class="v12-font-card">
+                    <img src="data:image/jpeg;base64,{_img_b64}"
+                         alt="{_i:03d}｜{_font_name}" loading="lazy">
+                    <div class="v12-font-card-meta">
+                        <span class="v12-font-card-no">{_i:03d}</span>
+                        <span class="v12-font-card-name">{_font_name}</span>
+                    </div>
+                </div>
+                """
+            )
+        except Exception:
+            # 單一預覽圖異常時，不中斷整個字型總覽。
+            continue
+
+    _font_cards_html.append("</div>")
+    st.markdown("".join(_font_cards_html), unsafe_allow_html=True)
+
+    _pick_col, _apply_col = st.columns([2.2, 1])
+    with _pick_col:
+        _gallery_pick = st.number_input(
+            "🎯 輸入要選用的字型編號",
+            min_value=_start_no,
+            max_value=_end_no,
+            value=_start_no,
+            step=1,
+            key=f"v12_font_gallery_pick_page_{_current_page}",
+        )
+    with _apply_col:
+        st.markdown("<div style='height:1.85rem'></div>", unsafe_allow_html=True)
+        _apply_font_pick = st.button(
+            f"選用 {_gallery_pick:03d}",
+            key=f"v12_font_gallery_apply_page_{_current_page}",
+            use_container_width=True,
+        )
+
+    if _apply_font_pick:
+        _picked_font = int(_gallery_pick)
+        st.session_state["v8_selected_font"] = _picked_font
+        st.session_state["v12_font_quick_pick"] = (
+            f"{_picked_font:03d}｜{V8_TEXT_EFFECT_CATALOG[_picked_font]}"
+        )
+        st.session_state["v10_scroll_to_font_result"] = True
+        st.session_state["v10_font_gallery_open"] = False
+        st.rerun()
 
     # callback 會在 Streamlit 下一次完整執行前更新頁數，
     # 不會在 widget 已實例化後直接修改其 key。
