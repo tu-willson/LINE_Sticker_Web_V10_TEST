@@ -3019,16 +3019,15 @@ with _link_col:
 # ============================================================
 def _public02a_settings_panel():
     # ============================================================
-    # V12｜STEP 01B②｜個人設定區域最終穩定版
+    # V12｜STEP 01B②｜個人設定操作區統一版
     #
-    # 核心修正：
-    # 1. 不再只修改「匯入按鈕」本身，因為 file_uploader 的可點擊區
-    #    實際上是外層 Dropzone，造成外框與文字按鈕大小分離。
-    # 2. 匯出與匯入都使用同一個 34rem 操作寬度。
-    # 3. 匯入改由 Dropzone 本身承擔完整按鈕外觀，因此「看到的框」
-    #    與「實際可點擊區域」完全一致。
-    # 4. 標題、匯出、匯入全部以同一中心軸對齊。
-    # 5. 手機版自動放寬，但仍保留左右安全邊距。
+    # 修正原則：
+    # 1. 不再依賴 st.file_uploader 自己的 key class 當版面外框。
+    #    Streamlit 的 uploader 內部 DOM 與 button / dropzone 層級不同，
+    #    先前造成「外層可點擊區」與「內層視覺按鈕」分離。
+    # 2. 匯出與匯入各自放入同一規格的具名 st.container。
+    # 3. CSS 只鎖定這兩個操作 container，不碰全站 uploader/button。
+    # 4. 匯入直接把真正的 Dropzone 做成與匯出相同尺寸的完整操作框。
     # ============================================================
 
     st.markdown(
@@ -3059,22 +3058,41 @@ def _public02a_settings_panel():
         indent=2,
     ).encode("utf-8")
 
+    # 兩個功能使用相同的「具名外層 container」。
+    # 這是本次修正的核心：版面寬度由穩定的 container 決定，
+    # 不再直接猜測 file_uploader 的內部 key class 位於哪一層。
     st.markdown(
         """
         <style>
-        /* ===================================================== */
-        /* V12 個人設定｜統一幾何尺寸                             */
-        /* ===================================================== */
-
         :root{
-            --v12-settings-width:min(34rem, calc(100vw - 2rem));
-            --v12-settings-height:3.35rem;
+            --v12-settings-panel-width:min(34rem, calc(100vw - 2rem));
+            --v12-settings-panel-height:3.35rem;
         }
 
-        .v12-settings-label{
-            width:var(--v12-settings-width) !important;
+        /* ===================================================== */
+        /* V12 個人設定｜兩個操作區使用同一套外層幾何規則         */
+        /* ===================================================== */
+        div.st-key-v12_settings_export_block,
+        div.st-key-v12_settings_import_block{
+            width:var(--v12-settings-panel-width) !important;
             max-width:34rem !important;
-            margin:2.25rem auto .72rem !important;
+            margin-left:auto !important;
+            margin-right:auto !important;
+            box-sizing:border-box !important;
+        }
+
+        div.st-key-v12_settings_export_block{
+            margin-top:2.25rem !important;
+        }
+
+        div.st-key-v12_settings_import_block{
+            margin-top:2.25rem !important;
+        }
+
+        div.st-key-v12_settings_export_block .v12-settings-label,
+        div.st-key-v12_settings_import_block .v12-settings-label{
+            width:100% !important;
+            margin:0 0 .72rem !important;
             padding:0 !important;
             box-sizing:border-box !important;
             text-align:center !important;
@@ -3083,32 +3101,24 @@ def _public02a_settings_panel():
             line-height:1.35 !important;
         }
 
-        /* Streamlit 元件外層：兩者使用完全相同的中心與寬度 */
-        div.st-key-public02a_export_settings,
-        div.st-key-public02a_import_settings{
-            width:var(--v12-settings-width) !important;
-            max-width:34rem !important;
-            margin-left:auto !important;
-            margin-right:auto !important;
+        /* ===================================================== */
+        /* 📤 匯出：容器 → DownloadButton → button 全部同寬       */
+        /* ===================================================== */
+        div.st-key-v12_settings_export_block
+        [data-testid="stDownloadButton"],
+        div.st-key-v12_settings_export_block
+        [data-testid="stDownloadButton"] > button{
+            width:100% !important;
+            max-width:100% !important;
             box-sizing:border-box !important;
         }
 
-        /* ===================================================== */
-        /* 匯出按鈕                                               */
-        /* ===================================================== */
-        div.st-key-public02a_export_settings > div,
-        div.st-key-public02a_export_settings [data-testid="stDownloadButton"]{
-            width:100% !important;
-        }
-
-        div.st-key-public02a_export_settings button{
-            width:100% !important;
-            min-width:100% !important;
-            height:var(--v12-settings-height) !important;
-            min-height:var(--v12-settings-height) !important;
+        div.st-key-v12_settings_export_block
+        [data-testid="stDownloadButton"] > button{
+            height:var(--v12-settings-panel-height) !important;
+            min-height:var(--v12-settings-panel-height) !important;
             margin:0 !important;
             padding:0 1rem !important;
-            box-sizing:border-box !important;
             display:flex !important;
             align-items:center !important;
             justify-content:center !important;
@@ -3119,57 +3129,47 @@ def _public02a_settings_panel():
         }
 
         /* ===================================================== */
-        /* 匯入區：直接把真正的 Dropzone 做成完整按鈕             */
+        /* 📥 匯入：外層 uploader、section、dropzone 全部同寬    */
         /* ===================================================== */
-        div.st-key-public02a_import_settings,
-        div.st-key-public02a_import_settings > div,
-        div.st-key-public02a_import_settings [data-testid="stFileUploader"]{
+        div.st-key-v12_settings_import_block
+        [data-testid="stFileUploader"],
+        div.st-key-v12_settings_import_block
+        [data-testid="stFileUploader"] > div,
+        div.st-key-v12_settings_import_block
+        [data-testid="stFileUploaderDropzone"]{
             width:100% !important;
             max-width:100% !important;
             box-sizing:border-box !important;
         }
 
-        /*
-        關鍵修正：
-        真正可點擊的是 Dropzone，不再把它設成透明。
-        直接讓它與匯出按鈕擁有相同的完整寬度與高度。
-        */
-        div.st-key-public02a_import_settings [data-testid="stFileUploaderDropzone"]{
-            width:100% !important;
-            max-width:100% !important;
-            height:var(--v12-settings-height) !important;
-            min-height:var(--v12-settings-height) !important;
+        div.st-key-v12_settings_import_block
+        [data-testid="stFileUploaderDropzone"]{
+            height:var(--v12-settings-panel-height) !important;
+            min-height:var(--v12-settings-panel-height) !important;
             margin:0 !important;
             padding:0 !important;
-            box-sizing:border-box !important;
             border:1px solid var(--border-color, #3b4350) !important;
             border-radius:.75rem !important;
             background:var(--secondary-background-color, #20242c) !important;
-            display:flex !important;
-            align-items:center !important;
-            justify-content:center !important;
             overflow:hidden !important;
             cursor:pointer !important;
         }
 
-        /* 移除原本的說明文字，避免它影響置中 */
-        div.st-key-public02a_import_settings
-        [data-testid="stFileUploaderDropzoneInstructions"]{
-            display:none !important;
-        }
-
-        div.st-key-public02a_import_settings small{
+        /* 移除 Dropzone 說明與容量文字，避免影響按鈕置中。 */
+        div.st-key-v12_settings_import_block
+        [data-testid="stFileUploaderDropzoneInstructions"],
+        div.st-key-v12_settings_import_block small{
             display:none !important;
         }
 
         /*
-        原生 Browse files 按鈕保留真實功能，
-        但把它拉滿整個 Dropzone，使可見區域＝可點擊區域。
+        原生 button 仍保留真正的檔案選擇功能。
+        只把它延展為與 Dropzone 完全相同的可見／可點擊區域。
         */
-        div.st-key-public02a_import_settings
+        div.st-key-v12_settings_import_block
         [data-testid="stFileUploaderDropzone"] button{
             width:100% !important;
-            min-width:100% !important;
+            max-width:100% !important;
             height:100% !important;
             min-height:100% !important;
             margin:0 !important;
@@ -3186,14 +3186,14 @@ def _public02a_settings_panel():
             overflow:hidden !important;
         }
 
-        /* 隱藏原生英文／內部文字，但不隱藏按鈕本身 */
-        div.st-key-public02a_import_settings
+        /* 隱藏原生英文內容，但保留原生 button 本身。 */
+        div.st-key-v12_settings_import_block
         [data-testid="stFileUploaderDropzone"] button > *{
             visibility:hidden !important;
         }
 
-        /* 使用固定覆蓋層，文字永遠在完整可點擊區的幾何中心 */
-        div.st-key-public02a_import_settings
+        /* 顯示中文按鈕文字，且永遠置於真正可點擊區正中央。 */
+        div.st-key-v12_settings_import_block
         [data-testid="stFileUploaderDropzone"] button::after{
             content:"匯入自定義設定";
             position:absolute !important;
@@ -3201,38 +3201,34 @@ def _public02a_settings_panel():
             display:flex !important;
             align-items:center !important;
             justify-content:center !important;
-            width:100% !important;
-            height:100% !important;
             padding:0 1rem !important;
             box-sizing:border-box !important;
             color:inherit !important;
             text-align:center !important;
             font-size:1.05rem !important;
             font-weight:700 !important;
-            line-height:1 !important;
+            line-height:1.25 !important;
             white-space:nowrap !important;
             pointer-events:none !important;
         }
 
-        /* Hover 時兩個操作元件維持原生互動，不改變尺寸 */
-        div.st-key-public02a_import_settings
+        div.st-key-v12_settings_import_block
         [data-testid="stFileUploaderDropzone"]:hover{
             filter:brightness(1.06);
         }
 
         /* ===================================================== */
-        /* 手機版                                                 */
+        /* 手機版：維持相同容器邏輯，只放寬至可用寬度             */
         /* ===================================================== */
         @media (max-width:640px){
             :root{
-                --v12-settings-width:calc(100vw - 2rem);
-                --v12-settings-height:3.25rem;
+                --v12-settings-panel-width:calc(100vw - 1.5rem);
+                --v12-settings-panel-height:3.25rem;
             }
 
-            .v12-settings-label,
-            div.st-key-public02a_export_settings,
-            div.st-key-public02a_import_settings{
-                width:var(--v12-settings-width) !important;
+            div.st-key-v12_settings_export_block,
+            div.st-key-v12_settings_import_block{
+                width:var(--v12-settings-panel-width) !important;
                 max-width:none !important;
             }
         }
@@ -3244,36 +3240,39 @@ def _public02a_settings_panel():
     # ------------------------------------------------------------
     # 📤 匯出
     # ------------------------------------------------------------
-    st.markdown(
-        '<div class="v12-settings-label">📤 匯出自定義設定</div>',
-        unsafe_allow_html=True,
-    )
+    with st.container(key="v12_settings_export_block"):
+        st.markdown(
+            '<div class="v12-settings-label">📤 匯出自定義設定</div>',
+            unsafe_allow_html=True,
+        )
 
-    st.download_button(
-        "匯出自定義設定",
-        data=export_data,
-        file_name="LINE貼圖工具_自定義設定.json",
-        mime="application/json",
-        use_container_width=True,
-        key="public02a_export_settings",
-    )
+        st.download_button(
+            "匯出自定義設定",
+            data=export_data,
+            file_name="LINE貼圖工具_自定義設定.json",
+            mime="application/json",
+            use_container_width=True,
+            key="public02a_export_settings",
+        )
 
     # ------------------------------------------------------------
     # 📥 匯入
     # ------------------------------------------------------------
-    st.markdown(
-        '<div class="v12-settings-label">📥 匯入自定義設定</div>',
-        unsafe_allow_html=True,
-    )
+    with st.container(key="v12_settings_import_block"):
+        st.markdown(
+            '<div class="v12-settings-label">📥 匯入自定義設定</div>',
+            unsafe_allow_html=True,
+        )
 
-    imported = st.file_uploader(
-        "匯入自定義設定",
-        type=["json"],
-        key="public02a_import_settings",
-        help="選擇之前匯出的 LINE貼圖工具_自定義設定.json",
-        label_visibility="collapsed",
-    )
+        imported = st.file_uploader(
+            "匯入自定義設定",
+            type=["json"],
+            key="public02a_import_settings",
+            help="選擇之前匯出的 LINE貼圖工具_自定義設定.json",
+            label_visibility="collapsed",
+        )
 
+    # 匯入處理邏輯保持原本功能，不改變資料格式與 rerun 流程。
     if imported is not None:
         try:
             raw = imported.getvalue()
