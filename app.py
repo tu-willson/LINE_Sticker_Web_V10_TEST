@@ -3118,13 +3118,14 @@ def _public02a_settings_panel():
             height:var(--v12-settings-panel-height) !important;
             min-height:var(--v12-settings-panel-height) !important;
             margin:0 !important;
-            padding:0 1rem !important;
+            padding:0 !important;
             display:flex !important;
             align-items:center !important;
             justify-content:center !important;
             text-align:center !important;
-            font-size:1.05rem !important;
-            font-weight:700 !important;
+            font-size:1.8rem !important;
+            line-height:1 !important;
+            font-weight:400 !important;
             white-space:nowrap !important;
         }
 
@@ -3186,29 +3187,32 @@ def _public02a_settings_panel():
             overflow:hidden !important;
         }
 
-        /* 隱藏原生英文內容，但保留原生 button 本身。 */
+        /*
+        圖示版：
+        不再使用中文 ::after 覆蓋 Streamlit 原生文字，
+        避免原生 span / button layout 與偽元素產生裁切或位移。
+        原生內容僅視覺隱藏，真正的 button 與檔案選擇功能完整保留。
+        */
         div.st-key-v12_settings_import_block
         [data-testid="stFileUploaderDropzone"] button > *{
             visibility:hidden !important;
         }
 
-        /* 顯示中文按鈕文字，且永遠置於真正可點擊區正中央。 */
         div.st-key-v12_settings_import_block
         [data-testid="stFileUploaderDropzone"] button::after{
-            content:"匯入自定義設定";
+            content:"📥";
             position:absolute !important;
             inset:0 !important;
             display:flex !important;
             align-items:center !important;
             justify-content:center !important;
-            padding:0 1rem !important;
+            padding:0 !important;
             box-sizing:border-box !important;
             color:inherit !important;
             text-align:center !important;
-            font-size:1.05rem !important;
-            font-weight:700 !important;
-            line-height:1.25 !important;
-            white-space:nowrap !important;
+            font-size:1.8rem !important;
+            font-weight:400 !important;
+            line-height:1 !important;
             pointer-events:none !important;
         }
 
@@ -3247,7 +3251,7 @@ def _public02a_settings_panel():
         )
 
         st.download_button(
-            "匯出自定義設定",
+            "📤",
             data=export_data,
             file_name="LINE貼圖工具_自定義設定.json",
             mime="application/json",
