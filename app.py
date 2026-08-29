@@ -2116,44 +2116,6 @@ if st.session_state.v10_font_gallery_open:
     )
     st.session_state.v12_font_gallery_page = _current_page
 
-    # V12｜STEP 01B②
-    # 翻頁控制放在「頁數選單正下方、字型圖片正上方」。
-    def _v12_font_change_page(delta):
-        current = int(st.session_state.get("v12_font_gallery_page_select", 1))
-        target = max(1, min(_font_total_pages, current + delta))
-        st.session_state["v12_font_gallery_page_select"] = target
-        st.session_state["v12_font_gallery_page"] = target
-
-    _prev_col, _page_col, _next_col = st.columns([1, 1.15, 1])
-
-    with _prev_col:
-        st.button(
-            "⬅️ 上一頁",
-            key="v12_font_prev",
-            use_container_width=True,
-            disabled=_current_page <= 1,
-            on_click=_v12_font_change_page,
-            args=(-1,),
-        )
-
-    with _page_col:
-        st.markdown(
-            f'<div style="text-align:center;padding:.72rem 0;font-weight:800;">'
-            f'第 {_current_page} / {_font_total_pages} 頁'
-            f'</div>',
-            unsafe_allow_html=True,
-        )
-
-    with _next_col:
-        st.button(
-            "下一頁 ➡️",
-            key="v12_font_next",
-            use_container_width=True,
-            disabled=_current_page >= _font_total_pages,
-            on_click=_v12_font_change_page,
-            args=(1,),
-        )
-
     _start_no = (_current_page - 1) * _font_per_page + 1
     _end_no = min(125, _start_no + _font_per_page - 1)
     st.caption(f"目前顯示 {_start_no:03d}～{_end_no:03d} ／ 125")
@@ -2205,6 +2167,38 @@ if st.session_state.v10_font_gallery_open:
                 )
 
                 st.caption(V8_TEXT_EFFECT_CATALOG[_i])
+    # callback 會在 Streamlit 下一次完整執行前更新頁數，
+    # 不會在 widget 已實例化後直接修改其 key。
+    def _v12_font_change_page(delta):
+        current = int(st.session_state.get("v12_font_gallery_page_select", 1))
+        target = max(1, min(_font_total_pages, current + delta))
+        st.session_state["v12_font_gallery_page_select"] = target
+        st.session_state["v12_font_gallery_page"] = target
+
+    _prev_col, _page_col, _next_col = st.columns([1, 1.2, 1])
+    with _prev_col:
+        st.button(
+            "⬅️ 上一頁",
+            key="v12_font_prev",
+            use_container_width=True,
+            disabled=_current_page <= 1,
+            on_click=_v12_font_change_page,
+            args=(-1,),
+        )
+    with _page_col:
+        st.markdown(
+            f'<div style="text-align:center;padding:.55rem 0;font-weight:800;">第 {_current_page} / {_font_total_pages} 頁</div>',
+            unsafe_allow_html=True,
+        )
+    with _next_col:
+        st.button(
+            "下一頁 ➡️",
+            key="v12_font_next",
+            use_container_width=True,
+            disabled=_current_page >= _font_total_pages,
+            on_click=_v12_font_change_page,
+            args=(1,),
+        )
 
 
 with st.expander("🔎 已選字型大圖", expanded=False):
@@ -3052,90 +3046,112 @@ def _public02a_settings_panel():
         indent=2,
     ).encode("utf-8")
 
-    # V12｜STEP 01B②
-    # 個人設定改為上下排列：
-    # 1. 匯出／匯入各自獨立一列
-    # 2. 標題與按鈕全部置中
-    # 3. 兩個按鈕使用相同寬度與高度
-    # 4. 手機與桌機一致，不再受左右欄位擠壓
+    # V12｜STEP 01B②｜個人設定區域一致性修正
+    #
+    # 判斷原則：
+    # 1. 匯出與匯入雖然都是「操作按鈕」，但 Streamlit 底層元件不同：
+    #    download_button 是一般 button；file_uploader 是巢狀 uploader/dropzone/button。
+    # 2. 因此不能只比較外框寬度，還必須同時鎖定「內層文字的水平置中」。
+    # 3. 兩個操作區改用相同的固定最大寬度與相同的垂直節奏。
+    # 4. 手機版再自動放寬至接近滿版，避免桌機固定寬度造成過窄。
     st.markdown(
         """
         <style>
-        .v12-settings-stack{
-            width:100%;
-            margin:0 auto 1.15rem;
-        }
+        /* ===== 個人設定：統一操作區寬度 ===== */
         .v12-settings-label{
+            width:min(34rem, calc(100vw - 2rem));
+            margin:2.2rem auto .75rem !important;
             text-align:center !important;
             font-size:1.08rem;
             font-weight:800;
-            margin:.85rem 0 .55rem;
         }
 
-        /* 兩個元件由相同的中央欄位控制寬度，避免原生元件外框不一致 */
         div.st-key-public02a_export_settings,
         div.st-key-public02a_import_settings{
-            width:100% !important;
-            max-width:100% !important;
-            margin:0 !important;
-        }
-
-        div.st-key-public02a_export_settings,
-        div.st-key-public02a_import_settings,
-        div.st-key-public02a_import_settings [data-testid="stFileUploader"],
-        div.st-key-public02a_import_settings [data-testid="stFileUploaderDropzone"],
-        div.st-key-public02a_import_settings [data-testid="stFileUploaderDropzone"] > div{
-            width:100% !important;
-            max-width:100% !important;
+            width:min(34rem, calc(100vw - 2rem)) !important;
+            max-width:34rem !important;
+            margin-left:auto !important;
+            margin-right:auto !important;
             box-sizing:border-box !important;
         }
 
-        div.st-key-public02a_export_settings button,
-        div.st-key-public02a_import_settings button{
+        /* ===== 匯出：標準 Streamlit button ===== */
+        div.st-key-public02a_export_settings button{
             width:100% !important;
-            min-width:100% !important;
-            min-height:3.35rem !important;
-            box-sizing:border-box !important;
+            min-height:3.15rem !important;
             display:flex !important;
             align-items:center !important;
             justify-content:center !important;
-            font-size:1.08rem !important;
-            font-weight:700 !important;
+            text-align:center !important;
+            box-sizing:border-box !important;
+            font-size:1.05rem !important;
         }
 
-        /* 匯入元件隱藏英文 Upload / Browse files 等雜訊 */
+        /* ===== 匯入：清掉 uploader 外框，只保留按鈕 ===== */
+        div.st-key-public02a_import_settings [data-testid="stFileUploader"],
+        div.st-key-public02a_import_settings [data-testid="stFileUploaderDropzone"],
+        div.st-key-public02a_import_settings section{
+            width:100% !important;
+            max-width:100% !important;
+            box-sizing:border-box !important;
+        }
+
         div.st-key-public02a_import_settings [data-testid="stFileUploaderDropzone"]{
             padding:0 !important;
             border:0 !important;
             background:transparent !important;
+            min-height:auto !important;
         }
+
         div.st-key-public02a_import_settings [data-testid="stFileUploaderDropzoneInstructions"],
         div.st-key-public02a_import_settings small{
             display:none !important;
         }
 
-        /* 將原生檔案選擇按鈕的英文完全替換為指定中文。 */
-        div.st-key-public02a_import_settings button,
-        div.st-key-public02a_import_settings button *{
-            font-size:0 !important;
+        /*
+        匯入按鈕文字強制使用「覆蓋式置中層」：
+        不依賴 Streamlit 內部 span / label 的原始對齊規則，
+        直接把文字固定在按鈕幾何中心。
+        */
+        div.st-key-public02a_import_settings button{
+            width:100% !important;
+            min-height:3.15rem !important;
+            box-sizing:border-box !important;
+            position:relative !important;
+            overflow:hidden !important;
+            display:block !important;
+            padding:0 !important;
         }
+
+        div.st-key-public02a_import_settings button > *{
+            visibility:hidden !important;
+        }
+
         div.st-key-public02a_import_settings button::after{
             content:"匯入自定義設定";
-            display:block !important;
-            font-size:1.08rem !important;
-            line-height:1.2 !important;
-            white-space:nowrap !important;
+            position:absolute !important;
+            inset:0 !important;
+            display:flex !important;
+            align-items:center !important;
+            justify-content:center !important;
+            width:100% !important;
+            height:100% !important;
             text-align:center !important;
+            font-size:1.05rem !important;
+            font-weight:700 !important;
+            line-height:1 !important;
+            white-space:nowrap !important;
+            pointer-events:none !important;
         }
 
         @media (max-width:640px){
-            .v12-settings-stack{
-                width:100%;
-            }
+            .v12-settings-label,
             div.st-key-public02a_export_settings,
             div.st-key-public02a_import_settings{
-                width:100% !important;
+                width:calc(100vw - 2rem) !important;
+                max-width:none !important;
             }
+
             div.st-key-public02a_export_settings button,
             div.st-key-public02a_import_settings button{
                 min-height:3.2rem !important;
@@ -3146,44 +3162,32 @@ def _public02a_settings_panel():
         unsafe_allow_html=True,
     )
 
-    # 📤 匯出
-    st.markdown('<div class="v12-settings-stack">', unsafe_allow_html=True)
+    # 📤 匯出：標題與按鈕各自置中，並與匯入使用完全相同的寬度規則。
     st.markdown(
         '<div class="v12-settings-label">📤 匯出自定義設定</div>',
         unsafe_allow_html=True,
     )
+    st.download_button(
+        "匯出自定義設定",
+        data=export_data,
+        file_name="LINE貼圖工具_自定義設定.json",
+        mime="application/json",
+        use_container_width=True,
+        key="public02a_export_settings",
+    )
 
-    # 使用相同的三欄中央欄位，兩個控制項會取得完全一致的實際寬度。
-    _exp_left, _exp_center, _exp_right = st.columns([1.25, 1, 1.25], gap="small")
-    with _exp_center:
-        st.download_button(
-            "匯出自定義設定",
-            data=export_data,
-            file_name="LINE貼圖工具_自定義設定.json",
-            mime="application/json",
-            use_container_width=True,
-            key="public02a_export_settings",
-        )
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    # 📥 匯入
-    st.markdown('<div class="v12-settings-stack">', unsafe_allow_html=True)
+    # 📥 匯入：同寬、同高度、文字以按鈕幾何中心強制置中。
     st.markdown(
         '<div class="v12-settings-label">📥 匯入自定義設定</div>',
         unsafe_allow_html=True,
     )
-
-    # 與匯出使用完全相同的欄位比例，確保兩個按鈕大小一致。
-    _imp_left, _imp_center, _imp_right = st.columns([1.25, 1, 1.25], gap="small")
-    with _imp_center:
-        imported = st.file_uploader(
-            "匯入自定義設定",
-            type=["json"],
-            key="public02a_import_settings",
-            help="選擇之前匯出的 LINE貼圖工具_自定義設定.json",
-            label_visibility="collapsed",
-            width="stretch",
-        )
+    imported = st.file_uploader(
+        "匯入自定義設定",
+        type=["json"],
+        key="public02a_import_settings",
+        help="選擇之前匯出的 LINE貼圖工具_自定義設定.json",
+        label_visibility="collapsed",
+    )
 
     if imported is not None:
         try:
@@ -3191,6 +3195,9 @@ def _public02a_settings_panel():
             import_hash = hashlib.sha256(raw).hexdigest()
             last_hash = st.session_state.get("public02a_last_import_hash")
 
+            # Streamlit keeps the uploader value across reruns. Only process
+            # a newly selected file; otherwise the same file would call
+            # st.rerun() forever.
             if import_hash != last_hash:
                 data = json.loads(raw.decode("utf-8"))
                 _public02a_apply_settings(data)
@@ -3202,7 +3209,6 @@ def _public02a_settings_panel():
         except Exception as exc:
             st.error(f"❌ 匯入失敗：{exc}")
 
-    st.markdown('</div>', unsafe_allow_html=True)
 
 # PUBLIC STEP 02A｜顯示個人設定匯出／匯入
 _public02a_settings_panel()
