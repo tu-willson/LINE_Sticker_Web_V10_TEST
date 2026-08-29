@@ -846,12 +846,29 @@ div[data-testid="stCheckbox"] label{
   }
 }
 @media (max-width:800px){
+  /* 手機瀏覽器底部工具列較高，置頂鍵往上避開系統導覽列 */
   .v12-back-to-top{
     width:46px;
     height:46px;
     right:14px;
-    bottom:14px;
+    bottom:88px;
     font-size:23px;
+  }
+}
+
+/* V12｜STEP 01B③-5｜手機字型圖卡強制雙欄
+   Streamlit 原生欄位在手機預設會折成單欄；這裡只針對字型總覽容器覆寫。 */
+@media (max-width:640px){
+  .st-key-v12_font_card_grid [data-testid="stHorizontalBlock"]{
+    flex-direction:row !important;
+    flex-wrap:wrap !important;
+    gap:9px !important;
+    align-items:flex-start !important;
+  }
+  .st-key-v12_font_card_grid [data-testid="stColumn"]{
+    flex:0 0 calc(50% - 4.5px) !important;
+    width:calc(50% - 4.5px) !important;
+    min-width:0 !important;
   }
 }
 
@@ -2025,6 +2042,11 @@ if st.session_state.pop("v10_scroll_to_font_result", False):
                         behavior: "instant",
                         block: "start"
                     });
+                    // 讓「已選擇 125 字型」成功標語完整留在畫面中，
+                    // 避免錨點剛好貼到最上方而看不出是否選取成功。
+                    requestAnimationFrame(() => {
+                        window.scrollBy({ top: -150, left: 0, behavior: "instant" });
+                    });
                 });
             });
         }
@@ -2113,37 +2135,38 @@ if st.session_state.v10_font_gallery_open:
     # 可直接點選的原生 Streamlit 字型圖卡。
     # 圖片維持原生 st.image，編號就是選取按鈕。
     # --------------------------------------------------------
-    _font_cols = st.columns(4)
+    # 用具名 container 包住原生 Streamlit 欄位，讓手機 CSS 能精準覆寫成雙欄。
+    with st.container(key="v12_font_card_grid"):
+        _font_cols = st.columns(4)
 
-    for _i in range(_start_no, _end_no + 1):
-        _p = V8_FONT_PREVIEW_DIR / f"{_i:03d}.jpg"
-        if not _p.exists():
-            continue
+        for _i in range(_start_no, _end_no + 1):
+            _p = V8_FONT_PREVIEW_DIR / f"{_i:03d}.jpg"
+            if not _p.exists():
+                continue
 
-        with _font_cols[(_i - _start_no) % 4]:
-            st.image(str(_p), use_container_width=True)
+            with _font_cols[(_i - _start_no) % 4]:
+                st.image(str(_p), use_container_width=True)
 
-            # 直接點選編號即可選取該字型。
-            # callback 先在 widget 建立前更新狀態，避免 Streamlit
-            # 禁止在同一次 rerun 中直接修改已建立的 selectbox key。
-            def _v12_pick_font_from_card(font_no=_i):
-                st.session_state["v8_selected_font"] = font_no
-                st.session_state["v10_scroll_to_font_result"] = True
-                st.session_state["v10_font_gallery_open"] = False
+                # 直接點選編號即可選取該字型。
+                # callback 先在 widget 建立前更新狀態，避免 Streamlit
+                # 禁止在同一次 rerun 中直接修改已建立的 selectbox key。
+                def _v12_pick_font_from_card(font_no=_i):
+                    st.session_state["v8_selected_font"] = font_no
+                    st.session_state["v10_scroll_to_font_result"] = True
+                    st.session_state["v10_font_gallery_open"] = False
 
-                # v12_font_quick_pick 是上方已建立的 widget key。
-                # 不直接寫入它，改由後續初始化／同步邏輯依 v8_selected_font
-                # 自動顯示目前選擇的字型，避免 StreamlitAPIException。
+                    # v12_font_quick_pick 是上方已建立的 widget key。
+                    # 不直接寫入它，改由後續初始化／同步邏輯依 v8_selected_font
+                    # 自動顯示目前選擇的字型，避免 StreamlitAPIException。
 
-            st.button(
-                f"{_i:03d}",
-                key=f"font_card_pick_{_i}",
-                use_container_width=True,
-                on_click=_v12_pick_font_from_card,
-            )
+                st.button(
+                    f"{_i:03d}",
+                    key=f"font_card_pick_{_i}",
+                    use_container_width=True,
+                    on_click=_v12_pick_font_from_card,
+                )
 
-            st.caption(V8_TEXT_EFFECT_CATALOG[_i])
-
+                st.caption(V8_TEXT_EFFECT_CATALOG[_i])
     # callback 會在 Streamlit 下一次完整執行前更新頁數，
     # 不會在 widget 已實例化後直接修改其 key。
     def _v12_font_change_page(delta):
