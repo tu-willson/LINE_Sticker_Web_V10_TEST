@@ -2067,8 +2067,9 @@ def base_boxes(w, h):
     return boxes
 
 # ============================================================
-# V12｜AI 貼圖文案助手 V1
-# - 使用 Responses API 進行「主題 → 情境延伸 → 16 句候選文案」
+# V12｜AI 貼圖文案助手 V6.2
+# - 保留「主題＋文案語氣」介面
+# - 強化「文字構成畫面 → 找生活瞬間 → 真人反應 → 台灣語感／經典梗 → 短句化」流程
 # - 與 gpt-image-2 圖片生成分開，不改動原本圖片生成流程
 # - AI 文案助手測試階段：暫時不扣網站每日 AI 額度，開放不限次數
 # - 自有 API 模式：使用使用者自己的 OpenAI API，不扣網站額度
@@ -2086,13 +2087,18 @@ V12_AI_COPY_TONES = [
 ]
 
 def _v12_ai_copy_generate(topic, tone, api_mode, user_api_key):
+    """V7.2｜AI 貼圖文字助手。
+    核心：優先幫使用者快速找到「真的會用」的貼圖字眼，
+    混合超日常、經典用語、主題場景與少量驚喜；不追求每句都想梗。
+
+    注意：API 呼叫結構刻意沿用已實測可工作的 V6.5，這一版只更換文案思考邏輯，
+    避免測試文案方向時同時改動 API 協定造成無法定位的錯誤。
+    """
     topic = str(topic or "").strip()
     tone = str(tone or "").strip()
     if not topic:
         raise ValueError("missing_topic")
 
-    # AI 文案助手目前是獨立測試功能：
-    # 暫時不使用網站每日 10 次 AI 額度，避免與圖片生成共用額度。
     if api_mode == "🔑 使用自己的 OpenAI API":
         if not user_api_key:
             raise ValueError("missing_user_api_key")
@@ -2114,58 +2120,114 @@ def _v12_ai_copy_generate(topic, tone, api_mode, user_api_key):
         "additionalProperties": False,
     }
 
+    _previous = st.session_state.get("v12_ai_copy_candidates", []) or []
+    _previous = [str(x).strip() for x in _previous if str(x).strip()][:16]
+
+    _pool_samples = []
+    try:
+        _theme_pools = st.session_state.get("v12_theme_pools", {}) or {}
+        for _theme_name, _phrases in _theme_pools.items():
+            for _phrase in (_phrases or []):
+                _phrase = str(_phrase).strip()
+                if _phrase and _phrase not in _pool_samples:
+                    _pool_samples.append(_phrase)
+                if len(_pool_samples) >= 80:
+                    break
+            if len(_pool_samples) >= 80:
+                break
+    except Exception:
+        _pool_samples = []
+
     system_prompt = (
-        "你是一位非常懂 LINE 貼圖的中文文案企劃。"
-        "你的任務不是寫文章，而是把使用者提供的一個主題，"
-        "延伸成日常聊天中真的會用到的貼圖情境，再寫出短、自然、有畫面感的貼圖文字。"
-        "請先在內部完成主題拆解與情境分布，但不要輸出你的分析過程；只輸出最後的 16 句候選文案。"
-        "16 句要有明顯不同的使用情境，例如：反應、吐槽、拒絕、驚訝、無奈、催促、開心、崩潰等，"
-        "不要只是同一句話換同義詞。"
-        "每句以 2～8 個中文字為優先，最多 10 個中文字；要像 LINE 對話，不要像標語、文章或解釋。"
-        "避免重複、避免過度正式、避免罕見書面語。"
-        "若主題帶有職業、身份或場景，請自然延伸該領域常見的生活情境。"
-        "不要加入編號、引號、emoji 或括號。"
+        "你是一位非常懂台灣日常聊天與 LINE 貼圖的文字助手。"
+        "你的主要工作不是參加文案比賽，也不是每一句都想出新梗；"
+        "而是幫使用者快速找到『這句我平常真的會用』的貼圖文字。\n\n"
+        "【V7 核心任務】"
+        "使用者給你一個主題與語氣，你要整理出一批可以直接拿來做 LINE 貼圖的短句。"
+        "16 句放在一起時，使用者應該能很快挑出至少 8 句想留下。"
+        "超日常、很普通但很好用的句子是高價值結果，不要因為不夠有創意就淘汰。"
+        "經典老梗、熟悉的網路用語、台灣口語也可以直接使用；熟悉不代表不好用。"
+        "主題場景用語同樣重要。少量真正自然的意外句可以混進來，但驚喜只是調味。\n\n"
+        "【四種來源，自然混合】"
+        "1. 超日常：收到、好的、等一下、我看看、馬上、先這樣、沒問題、辛苦了、晚點回等。"
+        "2. 經典／網路語感：蛤？、傻眼、笑死、真的假的、不要鬧、先不要、修但幾勒、我就爛、是在哈囉、真的會謝等；符合情境即可使用。"
+        "3. 主題場景：從主題找大家真的會遇到的小事件，再給出自然反應。"
+        "4. 少量驚喜：偶爾加入反轉、擬人、比喻、雙關或有點怪但成立的短句。"
+        "不要刻意平均分配四類，讓結果自然混合。\n\n"
+        "【最重要的判斷標準】"
+        "每一句都先問：『如果今天真的遇到這件事，我會不會把這句傳給朋友、同事、家人或群組？』"
+        "如果會，就算普通也可以留下。"
+        "如果只是看起來很有創意、很像 AI 在努力寫金句，但真人不太會這樣說，就改掉。"
+        "不要為了顯得厲害，把正常的話硬改得很奇怪。\n\n"
+        "【台灣語感】"
+        "使用自然繁體中文與台灣聊天語感。啦、欸、齁、捏、咧等語助詞可以使用，但不要每句都塞。"
+        "經典老梗可以使用；不要刻意追新，也不要刻意避開老梗。"
+        "不要大量堆流行語來假裝台灣。\n\n"
+        "【短句】"
+        "以 2～10 個中文字為主要目標。口語碎句、反問、感嘆、半句話都可以。"
+        "貼圖文字要一眼讀完，不必像完整句子，也不要寫成文章、標語或雞湯。\n\n"
+        "【語氣】"
+        f"主題：{topic}。\n"
+        f"使用者選擇的語氣：{tone}。\n"
+        "語氣會影響措辭與反應，但不要因為選了搞笑自然就強迫每一句搞笑。"
+        "所有語氣都以真人會說、真的能拿來聊天為前提。\n\n"
+        "【不要做】"
+        "不要為了創新而創新。不要每句都想梗。不要過度文青、雞湯、廣告腔。"
+        "不要把主題硬塞進每句。不要只是同義詞替換。不要大量產生 AI 式金句。"
+        "不要刻意避開經典用語。不要因為一句很普通就淘汰它。\n\n"
+        "【輸出】"
+        "只輸出最後 16 句候選文案。不要輸出分析、分類、編號、引號、emoji 或其他說明。"
     )
+
+    _avoid_text = ""
+    if _previous:
+        _avoid_text += (
+            "\n\n上一批已生成的 16 句。這次盡量換掉相同句子與高度相似的說法；"
+            "但如果某個經典或超常用語真的非常適合主題，可以自然再次出現：\n"
+            + "\n".join(f"- {x}" for x in _previous)
+        )
+    if _pool_samples:
+        _avoid_text += (
+            "\n\n使用者過去保存過的文案池。盡量補充不同的句子，不要機械重複：\n"
+            + "、".join(_pool_samples)
+        )
+
     user_prompt = (
         f"使用者主題：{topic}\n"
-        f"希望的語氣方向：{tone}\n\n"
-        "請產生 16 句可直接拿來做 LINE 貼圖的候選文字。"
-        "請讓 16 句涵蓋不同情緒與情境，並保持同一主題世界觀。"
+        f"希望的文案語氣：{tone}\n\n"
+        "請產生 16 句可以直接拿來做 LINE 貼圖的候選文字。"
+        "先在內部想像這個主題下真實會發生的生活小情境，再決定人物最自然的第一反應。"
+        "結果可以混合：很普通但超好用的話、經典用語、台灣口語、主題場景反應，以及少量意外句。"
+        "不要把 16 句全部做成梗，也不要為了看起來厲害而把正常話改得很怪。"
+        "最重要的是：使用者看到結果後，可以快速勾出自己真的想用的 8 句。"
+        + _avoid_text
     )
 
-    # 文案助手測試階段不扣網站額度，因此本次不需要 quota claim / refund。
-    quota_claimed = False
-    try:
-        response = _copy_client.responses.create(
-            model=V12_AI_COPY_MODEL,
-            input=[
-                {"role": "developer", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            text={
-                "format": {
-                    "type": "json_schema",
-                    "name": "line_sticker_copy",
-                    "strict": True,
-                    "schema": schema,
-                }
-            },
-            max_output_tokens=700,
-        )
-        raw = str(response.output_text or "").strip()
-        data = json.loads(raw)
-        phrases = data.get("phrases", []) if isinstance(data, dict) else []
-        phrases = [str(x).strip() for x in phrases if str(x).strip()]
-        # 去除完全重複，但不足 16 句就視為本次失敗，避免半成品污染 UI。
-        phrases = list(dict.fromkeys(phrases))
-        if len(phrases) != 16:
-            raise ValueError("invalid_phrase_count")
-        return phrases
-    except Exception:
-        if quota_claimed:
-            _refund_daily_ai_quota()
-        raise
-
+    # 保持 V6.5 已實測的 API 呼叫結構，不在這一版改 API 協定。
+    response = _copy_client.responses.create(
+        model=V12_AI_COPY_MODEL,
+        input=[
+            {"role": "developer", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        text={
+            "format": {
+                "type": "json_schema",
+                "name": "line_sticker_copy",
+                "strict": True,
+                "schema": schema,
+            }
+        },
+        max_output_tokens=1600,
+    )
+    raw = str(response.output_text or "").strip()
+    data = json.loads(raw)
+    phrases = data.get("phrases", []) if isinstance(data, dict) else []
+    phrases = [str(x).strip() for x in phrases if str(x).strip()]
+    phrases = list(dict.fromkeys(phrases))
+    if len(phrases) != 16:
+        raise ValueError("invalid_phrase_count")
+    return phrases
 
 def _v12_render_ai_copy_assistant(api_mode, user_api_key):
     """V12｜AI 文案助手＋多主題暫存池（Session-only）。
@@ -2243,8 +2305,9 @@ def _v12_render_ai_copy_assistant(api_mode, user_api_key):
                     st.session_state["v12_ai_copy_selected"] = []
                     for _i in range(16):
                         st.session_state[f"v12_ai_copy_pick_{_i}"] = False
-            except RuntimeError:
-                st.error("❌ AI 文案服務目前無法使用，請稍後再試。")
+            except RuntimeError as _e:
+                st.error("❌ AI 文案服務目前無法使用。")
+                st.caption(f"錯誤資訊：{_e}")
             except Exception:
                 st.error("❌ AI 文案產生失敗，請稍後再試。")
 
