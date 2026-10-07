@@ -4038,9 +4038,21 @@ if st.session_state.get("v11_generation_pending", False):
                 _status.success("🎉 AI 生成完成，正在進行最後圖片處理……")
             except Exception as _gen_exc:
                 _elapsed = time.monotonic() - _started_at
+
+                # 診斷修正版：只有真正等待達 180 秒以上，才顯示逾時。
+                # 其他 OpenAI / SDK / 參數 / 權限 / 網路錯誤保留原始例外，
+                # 避免所有錯誤都被誤包裝成 TimeoutError。
                 if _elapsed >= 180:
                     _v11_clear_generation_state()
-                raise TimeoutError("AI 生成逾時（超過 3 分鐘），請重新操作。") from _gen_exc
+                    raise TimeoutError(
+                        "AI 生成逾時（超過 3 分鐘），請重新操作。"
+                    ) from _gen_exc
+
+                # 在 Streamlit 畫面顯示診斷資訊，方便定位真正原因。
+                st.error(
+                    f"❌ AI 生成失敗｜{type(_gen_exc).__name__}: {_gen_exc}"
+                )
+                st.caption(f"診斷資訊：失敗發生於 {_elapsed:.1f} 秒；這不是 3 分鐘逾時。")
                 raise
             raw = base64.b64decode(result.data[0].b64_json)
             img = Image.open(BytesIO(raw)).convert("RGBA")
