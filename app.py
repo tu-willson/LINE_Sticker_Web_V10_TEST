@@ -4003,21 +4003,31 @@ if st.session_state.get("v11_generation_pending", False):
                 _status.info("🖌️ 正在準備貼圖構圖……")
 
                 # OpenAI SDK timeout：最長等待 180 秒。
+                # V12｜透明背景連動測試版
+                # 只有使用者勾選「使用透明背景 PNG」時，才送出 transparent 參數
+                # 與透明 Alpha 強制提示；未勾選時完全不傳 background。
+                _generation_prompt = prompt
+                _image_edit_kwargs = {
+                    "model": "gpt-image-2",
+                    "image": ("person.png", ib, "image/png"),
+                    "size": "1536x1024",
+                    "output_format": "png",
+                }
+
+                if transparent:
+                    _generation_prompt += (
+                        "\n\n【透明背景強制要求】"
+                        "\n輸出必須是真正的透明 PNG Alpha 背景。"
+                        "\n背景區域必須為 Alpha=0，不得繪製白色、灰色或任何棋盤格圖案。"
+                        "\n絕對不要用棋盤格、灰白方格或任何圖案來模擬透明背景。"
+                        "\n人物、物件與文字保留正常不透明像素，只有背景透明。"
+                    )
+                    _image_edit_kwargs["background"] = "transparent"
+
+                _image_edit_kwargs["prompt"] = _generation_prompt
                 result = _generation_client.with_options(timeout=180).images.edit(
-                model="gpt-image-2",
-                image=("person.png", ib, "image/png"),
-                prompt=(
-                    prompt
-                    + "\n\n【透明背景強制要求】"
-                    + "\n輸出必須是真正的透明 PNG Alpha 背景。"
-                    + "\n背景區域必須為 Alpha=0，不得繪製白色、灰色或任何棋盤格圖案。"
-                    + "\n絕對不要用棋盤格、灰白方格或任何圖案來模擬透明背景。"
-                    + "\n人物、物件與文字保留正常不透明像素，只有背景透明。"
-                ),
-                size="1536x1024",
-                background="transparent",
-                output_format="png",
-            )
+                    **_image_edit_kwargs
+                )
 
                 # V11｜02C-4④｜異常回應資料防護
                 # API 呼叫成功不代表一定取得有效圖片；空 data / 缺少 b64_json
