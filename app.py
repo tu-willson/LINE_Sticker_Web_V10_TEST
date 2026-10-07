@@ -4008,7 +4008,9 @@ if st.session_state.get("v11_generation_pending", False):
                 # 與透明 Alpha 強制提示；未勾選時完全不傳 background。
                 _generation_prompt = prompt
                 _image_edit_kwargs = {
-                    "model": "gpt-image-2",
+                    # V12｜模型分流：一般背景沿用 gpt-image-2；
+                    # 原生透明 PNG 使用已實測支援 Alpha 的 gpt-image-2.5-sunburst。
+                    "model": "gpt-image-2.5-sunburst" if transparent else "gpt-image-2",
                     "image": ("person.png", ib, "image/png"),
                     "size": "1536x1024",
                     "output_format": "png",
